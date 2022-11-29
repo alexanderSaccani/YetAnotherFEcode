@@ -93,13 +93,13 @@ figure(2); PlotMesh(Nodes,Elements,0);
 hold on; PlotFieldonDeformedMesh(Nodes,Elements,ULIN(1:3,:).','factor',1);
 
 % Nonlinear response
-u = static_equilibrium( PlateAssembly, F );
-U = reshape(u,6,[]);
-hold on
-PlotFieldonDeformedMesh(Nodes,Elements,U(1:3,:).','factor',1, 'color', 'w' );
-colormap gray
-
-drawnow
+% u = static_equilibrium( PlateAssembly, F );
+% U = reshape(u,6,[]);
+% hold on
+% PlotFieldonDeformedMesh(Nodes,Elements,U(1:3,:).','factor',1, 'color', 'w' );
+% colormap gray
+% 
+% drawnow
 
 %% Dynamic response using Implicit Newmark
 % forcing frequency of the average of first two natural frequencies

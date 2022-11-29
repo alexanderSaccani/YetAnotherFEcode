@@ -1,4 +1,4 @@
-function [ u_lin, u ] = static_equilibrium( Assembly, Fext, varargin )
+function [ u_lin, u ] = static_equilibrium_thermal( Assembly, Fext, T, varargin )
 % finds the equilibrium configuration of the model subject to Fext load.
 %   Detailed explanation goes here
 
@@ -25,7 +25,7 @@ switch method
             c0 = norm(Assembly.constrain_vector(Fext_j));
             it = 0;
             while true
-                [K, Fint] = Assembly.tangent_stiffness_and_force(u); %modify this function, should add T temperature to inputs!
+                [K, Fint] = Assembly.tangent_stiffness_and_force(u,T); %modify this function, should add T temperature to inputs!
                 residual = Fext_j - Fint;
                 c = norm(Assembly.constrain_vector(residual))/c0;
                 fprintf('STEP %d, ITERATION %d, RESIDUAL %d \n',j,it,c);

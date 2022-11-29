@@ -1,4 +1,4 @@
-function [ r, drdqdd,drdqd,drdq, c0] = residual_nonlinear( q, qd, qdd, t, Assembly, Fext)
+function [ r, drdqdd,drdqd,drdq, c0] = residual_thermal_nonlinear( q, qd, qdd, t, Assembly, Fext, T)
 %  RESIDUAL_NONLINEAR In the following function, we construct the residual needed for time integration 
 % of
 % 
@@ -51,7 +51,7 @@ C = Assembly.DATA.C;
 % need the constrained vector of displacements $\mathbf{q}$ to be converted to 
 % its counterpart $\mathbf{u}$ that contains all the degrees of freedom. 
 u = Assembly.unconstrain_vector(q);
-[K, F] = Assembly.tangent_stiffness_and_force(u); % entry of temperature vector required here with u. modify code accordingly. put field in assembly?? T(t)
+[K, F] = Assembly.tangent_stiffness_and_force(u,T(t)); % T(t) is the full nodal temperature vector
 %% 
 % These matrices and the external forcing vector are appropriately constrained 
 % according to the boundary conditions:

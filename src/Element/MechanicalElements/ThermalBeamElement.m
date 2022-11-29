@@ -183,7 +183,7 @@ classdef ThermalBeamElement < Element
             % nodes : matrix containing Nodal coordinates
             % x : vector of full DOFs in global coordinates
             
-            [x_e, t_e] = self.extract_element_data(x,t);
+            [x_e, t_e] = self.extract_element_data(x,t); % in t goes the global vector of nodal temperatures
             T_e = self.transformationMatrix;
             % Displacements in local coordinates
             q = T_e*x_e;
