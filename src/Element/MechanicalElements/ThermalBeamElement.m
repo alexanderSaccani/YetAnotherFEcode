@@ -182,6 +182,7 @@ classdef ThermalBeamElement < Element
             % internal force vector in the global coordinates when the
             % nodes : matrix containing Nodal coordinates
             % x : vector of full DOFs in global coordinates
+            % t: vector of nodal temperatures
             
             [x_e, t_e] = self.extract_element_data(x,t); % in t goes the global vector of nodal temperatures
             T_e = self.transformationMatrix;

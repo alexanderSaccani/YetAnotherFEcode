@@ -14,7 +14,7 @@ n_BMs = 5; % number of buckling modes
 x_c = 0.08:0.04:0.92; % Center of the sin^2: factor of beam length
 
 % mesh
-nElements = 8;
+nElements = 3;
 dx = l/nElements;
 outdof = 3*floor(nElements/4) + 2; % output degree of freedom for displaying results
 
@@ -77,69 +77,128 @@ myElementConstructor = @()ThermalBeamElement(b, h, myThermalBeamMaterial); % sam
 % Mesh
 ThermalBeamMesh = Mesh(Nodes);
 ThermalBeamMesh.create_elements_table(Elements,myElementConstructor);
+nNodes = ThermalBeamMesh.nNodes;
+
+nodes_x = ThermalBeamMesh.nodes(:,1);
+nodes_y = ThermalBeamMesh.nodes(:,2);
 
 % Set dirichlet DOFs
-ThermalBeamMesh.set_essential_boundary_condition([1 ThermalBeamMesh.nNodes],[1 2 3],0) % Doubly clamped beam
+%ThermalBeamMesh.set_essential_boundary_condition([1 ThermalBeamMesh.nNodes],[1 2 3],0) % Doubly clamped beam
+ThermalBeamMesh.set_essential_boundary_condition([1],[1 2 3],0) % clamped beam
 ThermalBeamAssembly = Assembly(ThermalBeamMesh);
+
+nDofsF = ThermalBeamAssembly.Mesh.EBC.nDOFs;
+nDofsC = nDofsF - size(ThermalBeamAssembly.Mesh.EBC.constrainedDOFs,1);
+nNodes = ThermalBeamAssembly.Mesh.nNodes;
+
 % force
 % uniform transverse external force
 %f = ThermalBeamAssembly.uniform_body_force();
 
 %% eigenvalue analysis
 
-K = ThermalBeamAssembly.stiffness_matrix(); % a quale T? guarda come è calcolata
+K = ThermalBeamAssembly.stiffness_matrix(); % should be the stiffness matrix for T = 0
 M = ThermalBeamAssembly.mass_matrix();
 C = ThermalBeamAssembly.damping_matrix();
 
-n_VMs = 5; % first n_VMs modes with lowest frequency calculated 
+% u0 = zeros(nDofsF,1);
+% T0 = 0*ones(nNodes,1);
+% [K0,~] = ThermalBeamAssembly.tangent_stiffness_and_force(u0,T0);
+% 
+% diff = (K - K0);
+% diff = full(diff);
+
+n_VMs = 2; % first n_VMs modes with lowest frequency calculated 
 K_red = ThermalBeamAssembly.constrain_matrix(K); % at which temperature
 M_red = ThermalBeamAssembly.constrain_matrix(M);
-[V0,omega2] = eigs(K_red,M_red,n_VMs,'SM');
+[VM,omega2] = eigs(K_red,M_red,n_VMs,'SM'); 
 omega = sqrt(diag(omega2));
+%normalize with respect to max. amplitude
+for ii = 1:n_VMs
+    VM(:,ii) = VM(:,ii)/max(sqrt(sum(VM(:,ii).^2,2)));
+end
+VM = ThermalBeamAssembly.unconstrain_vector(VM);
 
-V0 = ThermalBeamAssembly.unconstrain_vector(V0);
-mod = 2;
-v1 = reshape(V0(:,mod),3,[]);
-PlotFieldonDeformedMesh(Nodes,Elements,v1(1:3,:).','factor',200)
-title(['Frequency = ' num2str(omega(mod)/(2*pi)) ' Hz'] )
+% %plot VMs
+% mode2plot = [1,2,3];
+% for ii = 1:length(mode2plot)
+%     v2plot = reshape(VM(:,mode2plot(ii)),3,[]);
+%     %plot VMs
+%     ud = v2plot(1,:)';
+%     vd = v2plot(2,:)';
+%     rot = v2plot(3,:)'; %this is the rotation (here we do not plot it)
+%     figure
+%     subplot 311
+%     title(['VM ',num2str(mode2plot(ii)),' Frequency = ' num2str(omega(mode2plot(ii))/(2*pi)) ' Hz'])
+%     plot(nodes_x,nodes_y,'-.','markersize',10); hold on;
+%     plot(nodes_x + ud, nodes_y + vd)
+%     subplot 312
+%     plot(nodes_x,vd,'-'); title('tranverse disp.');
+%     subplot 313
+%     plot(nodes_x,ud,'-'); title('longitudinal disp.');
+% end
+
+%% define Thermal modes
+
+% thermal mode 1 (uniform temp. distribution)
+th1 = ones(nNodes,1); 
+
+% thermal mode 2 (uniform temp. distribution over one half of the beam)
+th2 = zeros(nNodes,1);
+th2(1:round(nNodes/2)) = ones(round(nNodes/2),1); %
+
 
 %% Static analysis 
 
 % Nodal force
-F = zeros(ThermalBeamAssembly.Mesh.nDOFs,1);
-nf = find_node(l/2,0,[],Nodes); % node where to put the force
-node_force_dofs = get_index(nf, ThermalBeamAssembly.Mesh.nDOFPerNode );
-F(node_force_dofs(1)) = 30;
+F = zeros(nDofsF,1);
+node2plot = find_node(l/2,0,[],Nodes); % node where to put the force
+node_force_dofs = get_index(node2plot, ThermalBeamAssembly.Mesh.nDOFPerNode );
+F(node_force_dofs(2)) = 0;
 
-% Temperature field
-T = 100*ones(ThermalBeamAssembly.Mesh.nNodes,1); % static temperature field
+% Temperature field for static analysis
+T_st = 100*th2; % static temperature field (half beam is hot, half cold)
 
-% % linear static solution (wrong since the temperature is not considered!)
-% u_lin = ThermalBeamAssembly.solve_system(K, F); %this is wrong since the temperature must enter here!
-% ULIN = reshape(u_lin,3,[]).';	% Linear response
-% 
-% % nonlinear static solution (here instead the temperature is considered)
-% ThermalBeamAssembly.DATA.K = K;    % this value of K is used for first guess solution.
-% u = static_equilibrium_thermal(ThermalBeamAssembly, F, T,'display', 'iter-detailed');
-% UNL = reshape(u,3,[]).';        % Nonlinear response
+% % linear static solution (wrong since the temperature is not
+% % considered!)          PLEASE CHECK THIS!!!!
+%  u_lin = ThermalBeamAssembly.solve_system(K, F);                     %this is wrong since the temperature must enter here!
+% static.lin = reshape(u_lin,3,[]).';	% Linear response
+
+% nonlinear static solution (here instead the temperature is considered)
+[K,~] = ThermalBeamAssembly.tangent_stiffness_and_force(zeros(nDofsF,1),zeros(nNodes));
+ThermalBeamAssembly.DATA.K = K;    % this value of K is used only for first guess solution (T not considered in the linear guess!)
+[~,u] = static_equilibrium_thermal(ThermalBeamAssembly, F, T_st,'display', 'iter-detailed');
+static.nlin = reshape(u,3,[]).';     % Nonlinear response
+
+%plot static displacements
+ud = static.nlin(:,1);
+vd = static.nlin(:,2);
+wd = static.nlin(:,3);
+scl = 50;   %scaling factor
+
+% figure
+% subplot 311; plot(nodes_x,ud);
+% subplot 312; plot(nodes_x,vd);
+% subplot 313; plot(nodes_x,nodes_y,'.-','markersize',10,'color','b'); hold on;
+% plot(nodes_x + scl*ud, nodes_y + scl*vd, '.-', 'markersize',10,'color','r')
+% title('static deformation'), xlabel('x')
 
 
 %% Dynamic response using Implicit Newmark
 
 %thermal load
-eps = 1e-2; 
+eps = 0.05;%1e-2; 
 om_th = eps*omega(1);  % angular frequency of thermal mode oscillation in time
-T_temp = 2*pi/om_th; %period of temp. oscillations
-th1 = 100*ones(ThermalBeamAssembly.Mesh.nNodes,1); % thermal mode 1 (uniform temp. distribution)
-T_dyn = @(t) th1*sin(om_th*t);   % amplitude of thermal mode
+T_temp = 2*pi/om_th; % period of temp. oscillations
+T_dyn = @(t) 100*th1*sin(om_th*t); % amplitude of thermal mode
 
 %external forcing
 om_forcing = (omega(1) + omega(2))/2;
 F_ampl = 100; 
 
-F = zeros(ThermalBeamAssembly.Mesh.nDOFs,1);
-nf = find_node(l/2,0,[],Nodes); % node where to put the force
-node_force_dofs = get_index(nf, ThermalBeamAssembly.Mesh.nDOFPerNode );
+F = zeros(nDofsF,1);
+node2plot = find_node(l/2,0,[],Nodes); % node where to put the force
+node_force_dofs = get_index(node2plot, ThermalBeamAssembly.Mesh.nDOFPerNode );
 F(node_force_dofs(1)) = F_ampl;
 
 F_ext = @(t) F*sin(om_forcing*t);
@@ -147,13 +206,9 @@ F_ext = @(t) F*sin(om_forcing*t);
 T_forc =  2*pi/om_forcing; % time period of forcing
 
 % Initial condition: equilibrium
-u0 = zeros(ThermalBeamAssembly.Mesh.nDOFs, 1);
-v0 = zeros(ThermalBeamAssembly.Mesh.nDOFs, 1);
-a0 = zeros(ThermalBeamAssembly.Mesh.nDOFs, 1); % a0 = M\(F_ext(0)-C*v0-F(u0)) 
-
-q0 = ThermalBeamAssembly.constrain_vector(u0);
-qd0 = ThermalBeamAssembly.constrain_vector(v0);
-qdd0 = ThermalBeamAssembly.constrain_vector(a0);
+q0 = zeros(nDofsC,1);
+qd0 = zeros(nDofsC,1);
+qdd0 = zeros(nDofsC,1);
 
 % time step for integration
 h = T_forc/50;
@@ -193,21 +248,43 @@ tmax = 50*T_forc;
 TI_NL.Integrate(q0,qd0,qdd0,tmax,residual);
 TI_NL.Solution.u = ThermalBeamAssembly.unconstrain_vector(TI_NL.Solution.q);
 
+%% save displacements in another format
+
+n_tsamp = length(TI_NL.Solution.time);
+nDOFPerNode = ThermalBeamAssembly.Mesh.nDOFPerNode;
+
+dyn.nlin.disp = zeros(nNodes,nDOFPerNode,n_tsamp); % (node, dof of node, tsamp)
+u = ThermalBeamAssembly.unconstrain_vector(TI_NL.Solution.q); %unconstrained vector of displacements
+for ii = 1:n_tsamp
+   disp_ii = u(:,ii);
+   dyn.nlin.disp(:,:,ii) = (reshape(disp_ii,nDOFPerNode,[])).';
+end
+dyn.nlin.time = TI_NL.Solution.time;
+
+
 %% plot displacement of midspan
 plot_dof_location = 0.3; %percentage of length of beam
-nf = find_node(plot_dof_location*l,0,[],Nodes); % node where to put the force
-plot_dof = get_index(nf, ThermalBeamAssembly.Mesh.nDOFPerNode );
+node2plot = find_node(plot_dof_location*l,0,[],Nodes); % node where to put the force
+plot_dof = get_index(node2plot, ThermalBeamAssembly.Mesh.nDOFPerNode );
 
 figure;
 subplot 311
-plot(TI_NL.Solution.time, TI_NL.Solution.u(plot_dof(1),:),'DisplayName','v midspan');
-xlabel('time'); ylabel('v'); grid on; axis tight; legend('show')
+%plot(TI_NL.Solution.time, TI_NL.Solution.u(plot_dof(1),:),'DisplayName','v midspan'); hold on;
+plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,1,:)),'-');
+xlabel('t'); ylabel('u'); grid on; axis tight; 
+
 subplot 312
-plot(TI_NL.Solution.time, TI_NL.Solution.u(plot_dof(2),:),'DisplayName','u midspan');
-xlabel('time'); ylabel('u'); grid on; axis tight; legend('show')
+%plot(TI_NL.Solution.time, TI_NL.Solution.u(plot_dof(2),:),'DisplayName','u midspan'); hold on;
+plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,2,:)),'-');
+xlabel('t'); ylabel('v'); grid on; axis tight; 
+
 subplot 313
-plot(TI_NL.Solution.time, TI_NL.Solution.u(plot_dof(3),:),'DisplayName','w midspan');
-xlabel('time'); ylabel('w'); grid on; axis tight; legend('show')
+%plot(TI_NL.Solution.time, TI_NL.Solution.u(plot_dof(3),:),'DisplayName','w midspan'); hold on;
+plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,3,:)),'-');
+xlabel('t'); ylabel('w'); grid on; axis tight; 
+
+
+
 
 
 

@@ -12,12 +12,12 @@ switch method
     case 'fsolve'
         options = optimoptions('fsolve','SpecifyObjectiveGradient',true,...
             'MaxIterations',10000,'Display',displayoption);
-        [ueq] = fsolve(@(u)f(u,Assembly,Fext),u0,options);
+        [ueq] = fsolve(@(u)f(u,Assembly,Fext,T),u0,options);
         u = Assembly.unconstrain_vector(ueq);
         
     case 'newton'
         u = u_lin/nsteps;
-        figure; xlabel('Normalized load');ylabel('$$\|\mathbf{u}\|$$',Interpreter='latex')
+        figure; xlabel('Normalized load');ylabel('$$\|\mathbf{u}\|$$','Interpreter','latex')
         h = animatedline;
         addpoints(h,0,0);
         for j = 1:nsteps
@@ -43,9 +43,9 @@ end
 
 end
 
-function [F,K] = f(u,Assembly,Fext)
+function [F,K] = f(u,Assembly,Fext,T)
 x = Assembly.unconstrain_vector(u);
-[Kt, Fint] = Assembly.tangent_stiffness_and_force(x);
+[Kt, Fint] = Assembly.tangent_stiffness_and_force(x,T);
 K = Assembly.constrain_matrix(Kt);
 F = Assembly.constrain_vector(Fint - Fext);
 end
