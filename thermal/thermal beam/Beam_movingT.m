@@ -296,9 +296,11 @@ for ii = 1:length(time_tmp)
    axis(v_ax_bounds)
    xlabel('x'); ylabel('v')
    
-   pause(0.001);
+   pause(0.01);
    
 end
+
+
 
 
 % figT = figure('units','normalized','position',[.1 .7 .6 .2]);

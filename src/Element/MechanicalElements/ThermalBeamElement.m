@@ -224,7 +224,7 @@ classdef ThermalBeamElement < Element
             q = T_e * x_e;
             eta = T_e * v_e;
             [K_local] = self.stiffness_derivative_local(q,t_e,eta);
-            K = Te.' * K_local * Te;
+            K = T_e.' * K_local * T_e;
         end
         
         
