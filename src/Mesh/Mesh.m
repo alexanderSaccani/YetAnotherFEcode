@@ -40,7 +40,7 @@ classdef Mesh < handle
         
         function dofs = get_element_indices(self,j)
             % this function computes the indices corresponding to the j-th
-            %  element DOFs in the full vector of unknowns
+            % element DOFs in the full vector of unknowns
             dofs = self.Elements(j).iDOFs;
         end
         

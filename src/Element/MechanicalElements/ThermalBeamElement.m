@@ -11,7 +11,7 @@ classdef ThermalBeamElement < Element
         area = 0                % Area of cross section of the beam
         Material = Material()   % Object of class Material
         areaMoment = 0          % Second moment of area of he beam
-        transformationMatrix
+        transformationMatrix    % transformation matrix from global to local (x_loc = T*x_glob)
         IsUpdated
     end
     
@@ -127,8 +127,8 @@ classdef ThermalBeamElement < Element
         function [xe,Te] = extract_element_data(self,x,T)
             % x is a vector of full DOFs
             index = get_index(self.nodeIDs,self.nDOFPerNode);
-            xe = x(index,:);
-            Te = T(self.nodeIDs,:);
+            xe = x(index,:); % xe vector of elements dofs
+            Te = T(self.nodeIDs,:); %Te vector of nodal element temperatures
         end
         
         function q = transform_to_local(self,x,TYPE)
@@ -149,7 +149,7 @@ classdef ThermalBeamElement < Element
                     x = T.' * q;
                     
                 case 'matrix'
-                    x = T * q * T.';
+                    x = T.' * q * T; %error????????????????????? ERROR CORRECTED?? 
             end
         end
         

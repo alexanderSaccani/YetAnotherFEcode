@@ -15,6 +15,7 @@ clearvars ; close all; clc
 l = 0.1; 
 h = 1e-3;
 b = 1e-2; 
+w = 0.1; % this parameter varies from 0 to 0.5 (straight beam to half circumference)
 
 
 %MATERIAL__________________________________________________________________
@@ -30,16 +31,26 @@ set(myThermalBeamMaterial,'YOUNGS_MODULUS', E,'DENSITY',rho,...
 
 
 %MESH______________________________________________________________________
-nElements = 60;
+nElements = 61;
 
 %define nodes
-dx = l/nElements; %x spacing between nodes
+R = (l/4 + l*w^2)/(2*w);
+yy = R - l*w;
+xx = l/2;
+th0 = atan(yy/xx);
 
-nodes_x = (0:dx:l).'; %x coordinates for nodes
-nodes_y = zeros(length(nodes_x),1); %y coordinates for nodes
+th = linspace(th0,pi-th0,nElements+1);
+
+nodes_x = (R*cos(th) + l/2)'; %x coordinates for nodes
+nodes_y = (R*sin(th) - (R-l*w))'; %y coordinates for nodes
 
 nNodes = length(nodes_x); %number of nodes
 nDofPerNode = 3;
+
+%plot nodes
+figure; title('beam mesh')
+plot(nodes_x,nodes_y,'*-');
+axis('equal')
 
 %create mesh from nodes
 Nodes = [nodes_x, nodes_y];
@@ -109,7 +120,7 @@ for ii = 1:length(mode2plot)
     plot(nodes_x,v_ii,'-'); title('tranverse disp.'); xlabel('x')
     subplot 413
     plot(nodes_x,u_ii,'-'); title('longitudinal disp.'); xlabel('x')
-    subplot 414
+    subplot 414 
     plot(nodes_x,r_ii,'-'); title('rotation'); xlabel('x')
     
 end
@@ -168,14 +179,14 @@ static.nlin = reshape(u,nDofPerNode,[]).';     % Nonlinear response
 %define external forcing
 om_fext = omega(1)/10;% + (omega(2) - omega(1))/12;
 T_fext = 2*pi/om_fext; % period of ex. forcing
-F_ampl = 50; 
+F_ampl = 100; 
 
 node_fext = find_node(l/2,0,[],Nodes); % node where to put the force
 fext_dof = get_index(node_fext, nDofPerNode );
 
 %construct forcing vector
 F = zeros(nDofsF,1);
-F(fext_dof(1)) = F_ampl;
+F(fext_dof(2)) = F_ampl;
 F_ext = @(t) F*sin(om_fext*t);
 
 %define thermal load 
@@ -203,11 +214,8 @@ T_th = 2*pi/om_th; % period of temp. oscillations
 % % % % end
 
 x0 = @(xc) xc - p/2; %left extreme of pulse
-% T_dyn_xc = @(xc) T_ampl*(sin(pi*(nodes_x-x0(xc))/p)).^2.*(heaviside(nodes_x-x0(xc)) - ...
-%     heaviside((nodes_x-x0(xc))-p)); %define the temperature as a function of xc only (T profile parametrized with xc)
-
-T_dyn_xc = @(xc) xc;%*T_ampl; %define the temperature as a function of xc only (T profile parametrized with xc)
-
+T_dyn_xc = @(xc) T_ampl*(sin(pi*(nodes_x-x0(xc))/p)).^2.*(heaviside(nodes_x-x0(xc)) - ...
+    heaviside((nodes_x-x0(xc))-p)); %define the temperature as a function of xc only (T profile parametrized with xc)
 
 xc_dyn = @(t) xci + A*sin(om_th*t); %define how center of pulse xc variates in time
 T_dyn_t = @(t) T_dyn_xc(xc_dyn(t)); %evaluate the temperature profile in time
@@ -251,74 +259,74 @@ end
 % u_dyn = BeamAssembly.unconstrain_vector(TI_NL.Solution.q); 
 % dyn.nlin.disp = decodeDofsNodes(u_dyn,nNodes,nDofPerNode); % (node, dof of node, tsamp)
 % dyn.nlin.time = TI_NL.Solution.time;
-% 
-% % % plot results of nonlinear dynamic analysis_____________________________
-% % 
-% % plot_dof_location = 0.3; %percentage of length of beam
-% % node2plot = find_node(plot_dof_location*l,0,[],Nodes); % node where to put the force
-% % plot_dof = get_index(node2plot, BeamAssembly.Mesh.nDOFPerNode );
-% % 
-% % figure;
-% % subplot 311
-% % plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,1,:)),'-');
-% % xlabel('t'); ylabel('u'); grid on; axis tight; 
-% % 
-% % subplot 312
-% % plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,2,:)),'-');
-% % xlabel('t'); ylabel('v'); grid on; axis tight; 
-% % 
-% % subplot 313
-% % plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,3,:)),'-');
-% % xlabel('t'); ylabel('w'); grid on; axis tight; 
-% 
-% % plot time history at different locations on the beam... do it in future
-% 
-% % %% plot results in time__________________________________________________
-% % 
-% % time_tmp = dyn.nlin.time; % time vec.
-% % u_tmp = squeeze(dyn.nlin.disp(:,1,:)); % long. displ.
-% % v_tmp = squeeze(dyn.nlin.disp(:,2,:)); % tranv. displ.
-% % 
-% % n_samp_plot = 500;
-% % dind_plot = round(length(time_tmp)/n_samp_plot);
-% % ind_plot = 1:dind_plot:length(time_tmp);
-% % time_tmp = time_tmp(ind_plot); % time vec.
-% % u_tmp = u_tmp(:,ind_plot); % long. displ.
-% % v_tmp = v_tmp(:,ind_plot);
-% % 
-% % u_ax_bounds = [0,l,1.1*min(min(u_tmp)),1.1*max(max(u_tmp))];
-% % v_ax_bounds = [0,l,1.1*min(min((v_tmp))),1.1*max(max(v_tmp))];
-% % 
-% % figure('units','normalized','position',[.1 .1 .8 .8]);
-% % for ii = 1:length(time_tmp)
-% %    
-% %    time_ii = time_tmp(ii);
-% %    
-% %    subplot 311
-% %    plot(nodes_x,T_dyn(time_tmp(ii)));
-% %    axis([0,l,0,T_ampl]);
-% %    xlabel('x'); ylabel('T');
-% %    
-% %    subplot 312
-% %    plot(nodes_x, u_tmp(:,ii))
-% %    axis(u_ax_bounds)
-% %    xlabel('x'); ylabel('u')
-% %    
-% %    subplot 313
-% %    plot(nodes_x, v_tmp(:,ii))
-% % %  axis([0,l,-1,1])
-% %    axis(v_ax_bounds)
-% %    xlabel('x'); ylabel('v')
-% %    
-% %    pause(0.001);
-% %    
-% % end
 
-%% Thermal VMs analysis (just to visualize them)
+% % plot results of nonlinear dynamic analysis_____________________________
+% 
+% plot_dof_location = 0.3; %percentage of length of beam
+% node2plot = find_node(plot_dof_location*l,0,[],Nodes); % node where to put the force
+% plot_dof = get_index(node2plot, BeamAssembly.Mesh.nDOFPerNode );
+% 
+% figure;
+% subplot 311
+% plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,1,:)),'-');
+% xlabel('t'); ylabel('u'); grid on; axis tight; 
+% 
+% subplot 312
+% plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,2,:)),'-');
+% xlabel('t'); ylabel('v'); grid on; axis tight; 
+% 
+% subplot 313
+% plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,3,:)),'-');
+% xlabel('t'); ylabel('w'); grid on; axis tight; 
+
+% plot time history at different locations on the beam... do it in future
+
+% %% plot results in time__________________________________________________
+% 
+% time_tmp = dyn.nlin.time; % time vec.
+% u_tmp = squeeze(dyn.nlin.disp(:,1,:)); % long. displ.
+% v_tmp = squeeze(dyn.nlin.disp(:,2,:)); % tranv. displ.
+% 
+% n_samp_plot = 500;
+% dind_plot = round(length(time_tmp)/n_samp_plot);
+% ind_plot = 1:dind_plot:length(time_tmp);
+% time_tmp = time_tmp(ind_plot); % time vec.
+% u_tmp = u_tmp(:,ind_plot); % long. displ.
+% v_tmp = v_tmp(:,ind_plot);
+% 
+% u_ax_bounds = [0,l,1.1*min(min(u_tmp)),1.1*max(max(u_tmp))];
+% v_ax_bounds = [0,l,1.1*min(min((v_tmp))),1.1*max(max(v_tmp))];
+% 
+% figure('units','normalized','position',[.1 .1 .8 .8]);
+% for ii = 1:length(time_tmp)
+%    
+%    time_ii = time_tmp(ii);
+%    
+%    subplot 311
+%    plot(nodes_x,T_dyn(time_tmp(ii)));
+%    axis([0,l,0,T_ampl]);
+%    xlabel('x'); ylabel('T');
+%    
+%    subplot 312
+%    plot(nodes_x, u_tmp(:,ii))
+%    axis(u_ax_bounds)
+%    xlabel('x'); ylabel('u')
+%    
+%    subplot 313
+%    plot(nodes_x, v_tmp(:,ii))
+% %  axis([0,l,-1,1])
+%    axis(v_ax_bounds)
+%    xlabel('x'); ylabel('v')
+%    
+%    pause(0.001);
+%    
+% end
+
+%% Thermal VMs analysis (just to visualize thermal modes)
 xc_sampl = [-p/2;linspace(p/2,l-p/2,3)']; %sample locations of center thermal pulse
-xc_sampl = [-p/2;0;0.01;0.05;0.085;0.1];
 
 T_sampl = zeros(nNodes,length(xc_sampl)); % T nodal distribution samples
+xc_sampl = [-p/2;0;0.01;0.05;0.085];
 
 %generate corresponding temperature profiles
 for ii = 1:length(xc_sampl)
@@ -326,11 +334,11 @@ for ii = 1:length(xc_sampl)
 end
 
 VMs_at_eq = 1; %do you want to compute VMs at thermal equilibrium? (set to 1 if yes, otherwise set to 0)
-[VMs,static_eq,omega] = VM_thermal(BeamAssembly,T_sampl,VMs_at_eq,2);
+[VMs,static_eq,omega] = VM_thermal(BeamAssembly,T_sampl,VMs_at_eq,4);
 
 %plot VMs__________________________________________________________________
 T_sampl_2_plot = 1:length(xc_sampl);
-mode2plot = [1,2];
+mode2plot = [1,2,3,4];
 
 %T distribution 
 figure('units','normalized','position',[.3 .3 .4 .4]); hold on;
@@ -463,11 +471,13 @@ xlabel('t'); ylabel('u'); grid on; axis tight;
 subplot 312; hold on;
 plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,2,:)),'-');
 plot(dyn_r.nlin.time,squeeze(dyn_r.nlin.disp(node2plot,2,:)),'x-');
+plot(dyn_r.nlin.time,squeeze(u_qs(node2plot,2,:)),'o-');
 xlabel('t'); ylabel('v'); grid on; axis tight; 
 
 subplot 313; hold on;
 plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,3,:)),'-');
 plot(dyn_r.nlin.time,squeeze(dyn_r.nlin.disp(node2plot,3,:)),'x-');
+plot(dyn_r.nlin.time,squeeze(u_qs(node2plot,3,:)),'o-');
 xlabel('t'); ylabel('w'); grid on; axis tight; 
 
 

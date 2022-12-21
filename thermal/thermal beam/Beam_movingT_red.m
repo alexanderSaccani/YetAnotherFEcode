@@ -88,30 +88,31 @@ VM = BeamAssembly.unconstrain_vector(VM); %vibration modes
 %decode output
 VM = decodeDofsNodes(VM,nNodes,nDofPerNode);
 
-% %plot VMs
-% mode2plot = [1,2,3];
-% for ii = 1:length(mode2plot)
-%   
-%     VM_ii = squeeze(VM(:,:,mode2plot(ii)));
-%     
-%     u_ii = VM_ii(:,1); % long. displ.
-%     v_ii = VM_ii(:,2); % transv. displ
-%     r_ii = VM_ii(:,3); % rotation
-%     
-%     figure
-%     subplot 311
-%     plot(nodes_x,nodes_y,'.-','markersize',10); hold on;
-%     plot(nodes_x + u_ii, nodes_y + v_ii,'.-','markersize',10)
-%     title(['VM ',num2str(mode2plot(ii)),', Frequency = '...
-%     num2str(omega(mode2plot(ii))/(2*pi)) ' Hz'])
-%     
-%     subplot 312
-%     plot(nodes_x,v_ii,'-'); title('tranverse disp.'); xlabel('x')
-%     subplot 313
-%     plot(nodes_x,u_ii,'-'); title('longitudinal disp.'); xlabel('x')
-%     
-%     
-% end
+%plot VMs
+mode2plot = [1,2];
+for ii = 1:length(mode2plot)
+  
+    VM_ii = squeeze(VM(:,:,mode2plot(ii)));
+    
+    u_ii = VM_ii(:,1); % long. displ.
+    v_ii = VM_ii(:,2); % transv. displ
+    r_ii = VM_ii(:,3); % rotation
+    
+    figure
+    subplot 411
+    plot(nodes_x,nodes_y,'.-','markersize',10); hold on;
+    plot(nodes_x + u_ii, nodes_y + v_ii,'.-','markersize',10)
+    title(['VM ',num2str(mode2plot(ii)),', Frequency = '...
+    num2str(omega(mode2plot(ii))/(2*pi)) ' Hz'])
+    
+    subplot 412
+    plot(nodes_x,v_ii,'-'); title('tranverse disp.'); xlabel('x')
+    subplot 413
+    plot(nodes_x,u_ii,'-'); title('longitudinal disp.'); xlabel('x')
+    subplot 414
+    plot(nodes_x,r_ii,'-'); title('rotation'); xlabel('x')
+    
+end
 
 
 %% Static analysis 
@@ -203,7 +204,8 @@ T_th = 2*pi/om_th; % period of temp. oscillations
 
 x0 = @(xc) xc - p/2; %left extreme of pulse
 T_dyn_xc = @(xc) T_ampl*(sin(pi*(nodes_x-x0(xc))/p)).^2.*(heaviside(nodes_x-x0(xc)) - ...
-    heaviside((nodes_x-x0(xc))-p)); %define the temperature as a function of xc only (T profile parametrized with xc)
+    heaviside((nodes_x-x0(xc))-p)); %define the temperature as a function of xc only (T profile parametrized with xc
+
 
 xc_dyn = @(t) xci + A*sin(om_th*t); %define how center of pulse xc variates in time
 T_dyn_t = @(t) T_dyn_xc(xc_dyn(t)); %evaluate the temperature profile in time
@@ -217,101 +219,102 @@ for ii = 1:length(time)
     pause(0.03);
 end
 
-% Integrate nonlinear EOM__________________________________________________
-
-% settings for integration
-tmax = T_th/4; % integration interval
-h = T_fext/50; % time step for integration
-
-% Initial condition: equilibrium
-q0 = zeros(nDofsC,1);
-qd0 = zeros(nDofsC,1);
-qdd0 = zeros(nDofsC,1);
-
-% Precompute data for Assembly object
-BeamAssembly.DATA.M = M;
-BeamAssembly.DATA.K = K;
-BeamAssembly.DATA.C = C;
-
-% Instantiate object for nonlinear time integration
-TI_NL = ImplicitNewmark('timestep',h,'alpha',0.005);
-
-% nonlinear Residual evaluation function handle
-residual = @(q,qd,qdd,t)residual_thermal_nonlinear(q,qd,qdd,t,...
-    BeamAssembly,F_ext, T_dyn_t);
-
-% integrate equations with Newmark scheme
-TI_NL.Integrate(q0,qd0,qdd0,tmax,residual);
-
-% store solution in more suitable array (only displacements)
-u_dyn = BeamAssembly.unconstrain_vector(TI_NL.Solution.q); 
-dyn.nlin.disp = decodeDofsNodes(u_dyn,nNodes,nDofPerNode); % (node, dof of node, tsamp)
-dyn.nlin.time = TI_NL.Solution.time;
-
-% % plot results of nonlinear dynamic analysis_____________________________
+% % Integrate nonlinear EOM__________________________________________________
 % 
-% plot_dof_location = 0.3; %percentage of length of beam
-% node2plot = find_node(plot_dof_location*l,0,[],Nodes); % node where to put the force
-% plot_dof = get_index(node2plot, BeamAssembly.Mesh.nDOFPerNode );
+% % settings for integration
+% tmax = T_th/4; % integration interval
+% h = T_fext/50; % time step for integration
 % 
-% figure;
-% subplot 311
-% plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,1,:)),'-');
-% xlabel('t'); ylabel('u'); grid on; axis tight; 
+% % Initial condition: equilibrium
+% q0 = zeros(nDofsC,1);
+% qd0 = zeros(nDofsC,1);
+% qdd0 = zeros(nDofsC,1);
 % 
-% subplot 312
-% plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,2,:)),'-');
-% xlabel('t'); ylabel('v'); grid on; axis tight; 
+% % Precompute data for Assembly object
+% BeamAssembly.DATA.M = M;
+% BeamAssembly.DATA.K = K;
+% BeamAssembly.DATA.C = C;
 % 
-% subplot 313
-% plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,3,:)),'-');
-% xlabel('t'); ylabel('w'); grid on; axis tight; 
-
-% plot time history at different locations on the beam... do it in future
-
-% %% plot results in time__________________________________________________
+% % Instantiate object for nonlinear time integration
+% TI_NL = ImplicitNewmark('timestep',h,'alpha',0.005);
 % 
-% time_tmp = dyn.nlin.time; % time vec.
-% u_tmp = squeeze(dyn.nlin.disp(:,1,:)); % long. displ.
-% v_tmp = squeeze(dyn.nlin.disp(:,2,:)); % tranv. displ.
+% % nonlinear Residual evaluation function handle
+% residual = @(q,qd,qdd,t)residual_thermal_nonlinear(q,qd,qdd,t,...
+%     BeamAssembly,F_ext, T_dyn_t);
 % 
-% n_samp_plot = 500;
-% dind_plot = round(length(time_tmp)/n_samp_plot);
-% ind_plot = 1:dind_plot:length(time_tmp);
-% time_tmp = time_tmp(ind_plot); % time vec.
-% u_tmp = u_tmp(:,ind_plot); % long. displ.
-% v_tmp = v_tmp(:,ind_plot);
+% % integrate equations with Newmark scheme
+% TI_NL.Integrate(q0,qd0,qdd0,tmax,residual);
 % 
-% u_ax_bounds = [0,l,1.1*min(min(u_tmp)),1.1*max(max(u_tmp))];
-% v_ax_bounds = [0,l,1.1*min(min((v_tmp))),1.1*max(max(v_tmp))];
+% % store solution in more suitable array (only displacements)
+% u_dyn = BeamAssembly.unconstrain_vector(TI_NL.Solution.q); 
+% dyn.nlin.disp = decodeDofsNodes(u_dyn,nNodes,nDofPerNode); % (node, dof of node, tsamp)
+% dyn.nlin.time = TI_NL.Solution.time;
 % 
-% figure('units','normalized','position',[.1 .1 .8 .8]);
-% for ii = 1:length(time_tmp)
-%    
-%    time_ii = time_tmp(ii);
-%    
-%    subplot 311
-%    plot(nodes_x,T_dyn(time_tmp(ii)));
-%    axis([0,l,0,T_ampl]);
-%    xlabel('x'); ylabel('T');
-%    
-%    subplot 312
-%    plot(nodes_x, u_tmp(:,ii))
-%    axis(u_ax_bounds)
-%    xlabel('x'); ylabel('u')
-%    
-%    subplot 313
-%    plot(nodes_x, v_tmp(:,ii))
-% %  axis([0,l,-1,1])
-%    axis(v_ax_bounds)
-%    xlabel('x'); ylabel('v')
-%    
-%    pause(0.001);
-%    
-% end
+% % % plot results of nonlinear dynamic analysis_____________________________
+% % 
+% % plot_dof_location = 0.3; %percentage of length of beam
+% % node2plot = find_node(plot_dof_location*l,0,[],Nodes); % node where to put the force
+% % plot_dof = get_index(node2plot, BeamAssembly.Mesh.nDOFPerNode );
+% % 
+% % figure;
+% % subplot 311
+% % plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,1,:)),'-');
+% % xlabel('t'); ylabel('u'); grid on; axis tight; 
+% % 
+% % subplot 312
+% % plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,2,:)),'-');
+% % xlabel('t'); ylabel('v'); grid on; axis tight; 
+% % 
+% % subplot 313
+% % plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,3,:)),'-');
+% % xlabel('t'); ylabel('w'); grid on; axis tight; 
+% 
+% % plot time history at different locations on the beam... do it in future
+% 
+% % %% plot results in time__________________________________________________
+% % 
+% % time_tmp = dyn.nlin.time; % time vec.
+% % u_tmp = squeeze(dyn.nlin.disp(:,1,:)); % long. displ.
+% % v_tmp = squeeze(dyn.nlin.disp(:,2,:)); % tranv. displ.
+% % 
+% % n_samp_plot = 500;
+% % dind_plot = round(length(time_tmp)/n_samp_plot);
+% % ind_plot = 1:dind_plot:length(time_tmp);
+% % time_tmp = time_tmp(ind_plot); % time vec.
+% % u_tmp = u_tmp(:,ind_plot); % long. displ.
+% % v_tmp = v_tmp(:,ind_plot);
+% % 
+% % u_ax_bounds = [0,l,1.1*min(min(u_tmp)),1.1*max(max(u_tmp))];
+% % v_ax_bounds = [0,l,1.1*min(min((v_tmp))),1.1*max(max(v_tmp))];
+% % 
+% % figure('units','normalized','position',[.1 .1 .8 .8]);
+% % for ii = 1:length(time_tmp)
+% %    
+% %    time_ii = time_tmp(ii);
+% %    
+% %    subplot 311
+% %    plot(nodes_x,T_dyn(time_tmp(ii)));
+% %    axis([0,l,0,T_ampl]);
+% %    xlabel('x'); ylabel('T');
+% %    
+% %    subplot 312
+% %    plot(nodes_x, u_tmp(:,ii))
+% %    axis(u_ax_bounds)
+% %    xlabel('x'); ylabel('u')
+% %    
+% %    subplot 313
+% %    plot(nodes_x, v_tmp(:,ii))
+% % %  axis([0,l,-1,1])
+% %    axis(v_ax_bounds)
+% %    xlabel('x'); ylabel('v')
+% %    
+% %    pause(0.001);
+% %    
+% % end
 
 %% Thermal VMs analysis (just to visualize them)
 xc_sampl = [-p/2;linspace(p/2,l-p/2,3)']; %sample locations of center thermal pulse
+xc_sampl = [-p/2;0;0.01;0.05;0.085;0.1];
 
 T_sampl = zeros(nNodes,length(xc_sampl)); % T nodal distribution samples
 
@@ -321,7 +324,7 @@ for ii = 1:length(xc_sampl)
 end
 
 VMs_at_eq = 1; %do you want to compute VMs at thermal equilibrium? (set to 1 if yes, otherwise set to 0)
-[VMs,static_eq,omega] = VM_thermal(BeamAssembly,T_sampl,0,2);
+[VMs,static_eq,omega] = VM_thermal(BeamAssembly,T_sampl,VMs_at_eq,2);
 
 %plot VMs__________________________________________________________________
 T_sampl_2_plot = 1:length(xc_sampl);

@@ -5,7 +5,7 @@ function [VM,static_eq,omega] = VM_thermal(assembly,T_samples,eq,n_VMs)
 %ones that are stored in vector Tsampl). VMs can be computed around the
 %undeformed configuration (if eq == 0 ) or with respect to the deformed by
 %temperature static configuration (if eq == 1). In this case the output provides
-%also the static deformation
+%also the static deformation.
 
 n_configs = size(T_samples,2);
 
@@ -38,14 +38,19 @@ for ii = 1:n_configs
     %compute tangent stiffness matrix at static equilibrium (linearized model)
     [K_ii,~] = assembly.tangent_stiffness_and_force(eq_ii,T_ii);
     KC_ii = assembly.constrain_matrix(K_ii);
+    
+    isKsym = max(max(K_ii-K_ii'));
 
     %compute Vibration Modes for T_ii 
     [VM_ii,omega2_ii] = eigs(KC_ii,MC,n_VMs,'SM'); 
     omega(:,ii) = sqrt(diag(omega2_ii));
 
-    for jj = 1:n_VMs
-        VM_ii(:,jj) = VM_ii(:,jj)/max(sqrt(sum(VM_ii(:,jj).^2,2))); %normalize with respect to max. amplitude
-    end
+%     for jj = 1:n_VMs
+%         VM_ii(:,jj) = VM_ii(:,jj)/max(sqrt(sum(VM_ii(:,jj).^2,2))); %normalize with respect to max. amplitude
+%     end
+
+% VM_ii = VM_ii./vecnorm(VM_ii); %normalize eigenvectors (they are unitary vectors)
+    
     VM_ii = assembly.unconstrain_vector(VM_ii); %vibration modes for T_ii
 
     VM{ii} = VM_ii;
