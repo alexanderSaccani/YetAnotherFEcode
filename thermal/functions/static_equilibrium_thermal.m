@@ -1,13 +1,19 @@
 function [ u_lin, u ] = static_equilibrium_thermal( Assembly, Fext, T, varargin )
 % finds the equilibrium configuration of the model subject to Fext load.
-%   Detailed explanation goes here
 
-%modify this function, should add T temperature to inputs for temperature dependent load!
+[nsteps,tol,method,displayoption,initialGuess] = parse_inputs(varargin{:});
+
 K = Assembly.DATA.K;
 u_lin = Assembly.solve_system(K,Fext);
-u0 = Assembly.constrain_vector(u_lin);
 
-[nsteps,tol,method,displayoption] = parse_inputs(varargin{:});
+if isempty(initialGuess)
+    u_guess = u_lin;
+    u0 = Assembly.constrain_vector(u_lin);
+else
+    u_guess = initialGuess;  %unconstrained vector (called lin, but not necesserely it is the linear solution)
+    u0 = Assembly.constrain_vector(u_guess); %constrained vector
+end
+
 switch method
     case 'fsolve'
         options = optimoptions('fsolve','SpecifyObjectiveGradient',true,...
@@ -16,7 +22,7 @@ switch method
         u = Assembly.unconstrain_vector(ueq);
         
     case 'newton'
-        u = u_lin/nsteps;
+        u = u_guess/nsteps;
         figure; xlabel('Normalized load');ylabel('$$\|\mathbf{u}\|$$','Interpreter','latex')
         h = animatedline;
         addpoints(h,0,0);
@@ -25,7 +31,7 @@ switch method
             c0 = norm(Assembly.constrain_vector(Fext_j));
             it = 0;
             while true
-                [K, Fint] = Assembly.tangent_stiffness_and_force(u,T); %modify this function, should add T temperature to inputs!
+                [K, Fint] = Assembly.tangent_stiffness_and_force(u,T);
                 residual = Fext_j - Fint;
                 c = norm(Assembly.constrain_vector(residual))/c0;
                 fprintf('STEP %d, ITERATION %d, RESIDUAL %d \n',j,it,c);
@@ -51,12 +57,13 @@ F = Assembly.constrain_vector(Fint - Fext);
 end
 
 
-function [nsteps,tol,method,displayoption] = parse_inputs(varargin)
+function [nsteps,tol,method,displayoption,initialGuess] = parse_inputs(varargin)
 %% parsing inputs
 defaultnsteps = 100;
 defaulttol = 1e-6;
 defaultmethod = 'fsolve';
 defaultdisplay = 'final';
+defaultInitialGuess = [];
 
 p = inputParser;
 addParameter(p,'nsteps',defaultnsteps, @(x)validateattributes(x, ...
@@ -67,10 +74,13 @@ addParameter(p,'method',defaultmethod,@(x)validateattributes(x, ...
     {'char'},{'nonempty'}))
 addParameter(p,'display',defaultdisplay,@(x)validateattributes(x, ...
     {'char'},{'nonempty'}))
+addParameter(p,'initialGuess', defaultInitialGuess, @(x)validateattributes(x, ...
+    {'numeric'},{'nonempty'}) );
 parse(p,varargin{:});
 
 nsteps = p.Results.nsteps;
 tol = p.Results.tol;
 method = p.Results.method;
 displayoption = p.Results.display;
+initialGuess = p.Results.initialGuess;
 end

@@ -1,4 +1,5 @@
 classdef ThermalBeamElement < Element
+    %implement gth, KT !!!!!!!!!!!
     properties              % Basis properties derived from Element Class
         nodes = []          % global coordinates of element nodes
         nodeIDs = []        % the index location of element nodes
@@ -87,7 +88,7 @@ classdef ThermalBeamElement < Element
                 6/l^2,    2/l,  -6/l^2,    4/l];
         end
         
-        function K = get.stiffnessMatrixLocal(self)
+        function K = get.stiffnessMatrixLocal(self) %stiffness matrix of the cold structure (around the origin)
             l = self.dx;
             K = sparse(6,6);
             K([1 4],[1 4]) = self.Material.YOUNGS_MODULUS * self.area * [  1/l, -1/l;
@@ -110,7 +111,7 @@ classdef ThermalBeamElement < Element
             
             % local uniform force (integration of shape functions over
             % length of the element)
-            f_local = [   l/2;
+            f_local = [   l/2; %uniform pressure applied to transversal AND axial displacements over the element (to the neutral axis)
                 l/2;
                 l^2/12;
                 l/2;
@@ -173,7 +174,7 @@ classdef ThermalBeamElement < Element
             % this function computes the element mass matrix in the global coordinates when the
             % nodes : matrix containing Nodal coordinates
             T_e = self.transformationMatrix;
-            K_local = self.stiffnessMatrixLocal;
+            K_local = self.stiffnessMatrixLocal; %this is the stiffness matrix of the cold structure
             K = T_e.' * K_local * T_e;
         end
         
@@ -225,6 +226,49 @@ classdef ThermalBeamElement < Element
             eta = T_e * v_e;
             [K_local] = self.stiffness_derivative_local(q,t_e,eta);
             K = T_e.' * K_local * T_e;
+        end
+
+        function [T2, globalSubs] = T2(self)
+            % this function computes the 3-tensor corresponding to the 
+            % quadratic component of the nonlinear internal force in 
+            % global coordinates at the element level.
+            
+            T_e = self.transformationMatrix;
+            
+            % global DOFs associated to the element nodes
+            index = get_index(self.nodeIDs,self.nDOFPerNode);
+            
+            % location of each dimension of tensor in global DOFs
+            globalSubs = {index, index, index};
+            
+            % compute tensor in local coordinates
+            m = length(index);
+            T2e = self.T2_local([m,m,m]);
+            
+            % rotate to global coordinates
+            T2 = ttm(T2e, {T_e.',T_e.',T_e.'},[1,2,3]);
+        end
+
+        function [T3, globalSubs] = T3(self)
+            % this function computes the 4-tensor corresponding to the 
+            % quadratic component of the nonlinear internal force in 
+            % global coordinates at the element level.
+            
+            T_e = self.transformationMatrix;
+            
+            % global DOFs associated to the element nodes
+            index = get_index(self.nodeIDs,self.nDOFPerNode);
+            
+            % location of each dimension of tensor in global DOFs
+            globalSubs = cell(4,1);
+            globalSubs(:) = {index};
+            
+            % compute tensor in local coordinates
+            m = length(index);
+            T3e = self.T3_local([m,m,m,m]);
+            
+            % rotate to global coordinates
+            T3 = ttm(T3e, {T_e.',T_e.',T_e.',T_e.'},[1,2,3,4]);
         end
         
         
@@ -336,6 +380,190 @@ classdef ThermalBeamElement < Element
                 0,                                                                                                                                                                            ((A*E*(36*vw1 - 36*vw2))/30 + (A*E*l*(3*vt1 + 3*vt2))/30)/l^2,                                                                                                                                                                                                                       (A*E*(4*vt1 - vt2))/30 + (A*E*(3*vw1 - 3*vw2))/(30*l),                                                    0,                                                                                                                                                                           -((A*E*(36*vw1 - 36*vw2))/30 + (A*E*l*(3*vt1 + 3*vt2))/30)/l^2,                                                                                                                                                                                                                       (A*E*(3*vw1 - 3*vw2))/(30*l) - (A*E*(vt1 - 4*vt2))/30;
                 (A*E*(12*vw1 - 12*vw2 + l*vt1 + l*vt2))/(10*l^2), -(3*A*E*(14*l*vu2 - 14*l*vu1 + 72*vw1*w1 - 72*vw1*w2 - 72*vw2*w1 + 72*vw2*w2 + 3*l^2*t1*vt1 + 3*l^2*t2*vt2 + 9*l*t1*vw1 - 9*l*t1*vw2 + 9*l*t2*vw1 - 9*l*t2*vw2 + 9*l*vt1*w1 - 9*l*vt1*w2 + 9*l*vt2*w1 - 9*l*vt2*w2))/(35*l^3),                                                    -(A*E*(14*l*vu2 - 14*l*vu1 + 108*vw1*w1 - 108*vw1*w2 - 108*vw2*w1 + 108*vw2*w2 - 3*l^2*t1*vt1 + 3*l^2*t1*vt2 + 3*l^2*t2*vt1 + 3*l^2*t2*vt2 + 36*l*t1*vw1 - 36*l*t1*vw2 + 36*l*vt1*w1 - 36*l*vt1*w2))/(140*l^2), -(A*E*(12*vw1 - 12*vw2 + l*vt1 + l*vt2))/(10*l^2),  (3*A*E*(14*l*vu2 - 14*l*vu1 + 72*vw1*w1 - 72*vw1*w2 - 72*vw2*w1 + 72*vw2*w2 + 3*l^2*t1*vt1 + 3*l^2*t2*vt2 + 9*l*t1*vw1 - 9*l*t1*vw2 + 9*l*t2*vw1 - 9*l*t2*vw2 + 9*l*vt1*w1 - 9*l*vt1*w2 + 9*l*vt2*w1 - 9*l*vt2*w2))/(35*l^3),                                                    -(A*E*(14*l*vu2 - 14*l*vu1 + 108*vw1*w1 - 108*vw1*w2 - 108*vw2*w1 + 108*vw2*w2 + 3*l^2*t1*vt1 + 3*l^2*t1*vt2 + 3*l^2*t2*vt1 - 3*l^2*t2*vt2 + 36*l*t2*vw1 - 36*l*t2*vw2 + 36*l*vt2*w1 - 36*l*vt2*w2))/(140*l^2);
                 -(A*E*(3*vw1 - 3*vw2 - l*vt1 + 4*l*vt2))/(30*l),                   (A*E*(14*l*vu2 - 14*l*vu1 + 108*vw1*w1 - 108*vw1*w2 - 108*vw2*w1 + 108*vw2*w2 + 3*l^2*t1*vt1 + 3*l^2*t1*vt2 + 3*l^2*t2*vt1 - 3*l^2*t2*vt2 + 36*l*t2*vw1 - 36*l*t2*vw2 + 36*l*vt2*w1 - 36*l*vt2*w2))/(140*l^2),                                                                                                  (A*E*(14*vu1 - 14*vu2 + 9*t1*vw1 - 9*t1*vw2 + 9*t2*vw1 - 9*t2*vw2 + 9*vt1*w1 - 9*vt1*w2 + 9*vt2*w1 - 9*vt2*w2 - 9*l*t1*vt1 + 6*l*t1*vt2 + 6*l*t2*vt1 - 9*l*t2*vt2))/420,    (A*E*(3*vw1 - 3*vw2 - l*vt1 + 4*l*vt2))/(30*l),                  -(A*E*(14*l*vu2 - 14*l*vu1 + 108*vw1*w1 - 108*vw1*w2 - 108*vw2*w1 + 108*vw2*w2 + 3*l^2*t1*vt1 + 3*l^2*t1*vt2 + 3*l^2*t2*vt1 - 3*l^2*t2*vt2 + 36*l*t2*vw1 - 36*l*t2*vw2 + 36*l*vt2*w1 - 36*l*vt2*w2))/(140*l^2), -(A*E*(56*l*vu1 - 56*l*vu2 - 108*vw1*w1 + 108*vw1*w2 + 108*vw2*w1 - 108*vw2*w2 - 6*l^2*t1*vt1 + 9*l^2*t1*vt2 + 9*l^2*t2*vt1 - 72*l^2*t2*vt2 - 9*l*t1*vw1 + 9*l*t1*vw2 + 9*l*t2*vw1 - 9*l*t2*vw2 - 9*l*vt1*w1 + 9*l*vt1*w2 + 9*l*vt2*w1 - 9*l*vt2*w2))/(420*l)];
+        end
+
+        function T2 = T2_local(self,SIZE)
+            l = self.dx;
+            E = self.Material.YOUNGS_MODULUS;
+            A = self.area;
+            
+            T2 = tenzeros(SIZE);
+            
+            
+            
+            T2(:,:,2) = [                 0, -(3*A*E)/(5*l^2), -(A*E)/(20*l),                 0,  (3*A*E)/(5*l^2), -(A*E)/(20*l);
+                -(6*A*E)/(5*l^2),                 0,              0,  (6*A*E)/(5*l^2),                 0,              0;
+                -(A*E)/(10*l),                 0,              0,     (A*E)/(10*l),                 0,              0;
+                0,  (3*A*E)/(5*l^2),  (A*E)/(20*l),                 0, -(3*A*E)/(5*l^2),  (A*E)/(20*l);
+                (6*A*E)/(5*l^2),                 0,              0, -(6*A*E)/(5*l^2),                 0,              0;
+                -(A*E)/(10*l),                 0,              0,     (A*E)/(10*l),                 0,              0];
+            
+            
+            T2(:,:,3) = [              0, -(A*E)/(20*l), -(A*E)/15,              0,  (A*E)/(20*l),  (A*E)/60;
+                -(A*E)/(10*l),              0,         0,  (A*E)/(10*l),              0,         0;
+                -(2*A*E)/15,              0,         0,     (2*A*E)/15,              0,         0;
+                0,  (A*E)/(20*l),  (A*E)/15,              0, -(A*E)/(20*l), -(A*E)/60;
+                (A*E)/(10*l),              0,         0, -(A*E)/(10*l),              0,         0;
+                (A*E)/30,              0,         0,      -(A*E)/30,              0,         0];
+            
+            
+            T2(:,:,5) = [                 0,  (3*A*E)/(5*l^2),  (A*E)/(20*l),                 0, -(3*A*E)/(5*l^2),  (A*E)/(20*l);
+                (6*A*E)/(5*l^2),                 0,              0, -(6*A*E)/(5*l^2),                 0,              0;
+                (A*E)/(10*l),                 0,              0,    -(A*E)/(10*l),                 0,              0;
+                0, -(3*A*E)/(5*l^2), -(A*E)/(20*l),                 0,  (3*A*E)/(5*l^2), -(A*E)/(20*l);
+                -(6*A*E)/(5*l^2),                 0,              0,  (6*A*E)/(5*l^2),                 0,              0;
+                (A*E)/(10*l),                 0,              0,    -(A*E)/(10*l),                 0,              0];
+            
+            
+            T2(:,:,6) = [              0, -(A*E)/(20*l),  (A*E)/60,              0,  (A*E)/(20*l), -(A*E)/15;
+                -(A*E)/(10*l),              0,         0,  (A*E)/(10*l),              0,         0;
+                (A*E)/30,              0,         0,      -(A*E)/30,              0,         0;
+                0,  (A*E)/(20*l), -(A*E)/60,              0, -(A*E)/(20*l),  (A*E)/15;
+                (A*E)/(10*l),              0,         0, -(A*E)/(10*l),              0,         0;
+                -(2*A*E)/15,              0,         0,     (2*A*E)/15,              0,         0];
+                       
+        end
+
+        function T3 = T3_local(self,SIZE)
+            l = self.dx;
+            E = self.Material.YOUNGS_MODULUS;
+            A = self.area;
+            
+            T3 = tenzeros(SIZE);            
+            
+            T3(:,:,2,2) = [ 0,                   0,                  0, 0,                   0,                  0;
+             0,  (36*A*E)/(35*l^3),  (9*A*E)/(70*l^2), 0, -(36*A*E)/(35*l^3),  (9*A*E)/(70*l^2);
+             0,   (9*A*E)/(70*l^2),    (3*A*E)/(70*l), 0,  -(9*A*E)/(70*l^2),                  0;
+             0,                   0,                  0, 0,                   0,                  0;
+             0, -(36*A*E)/(35*l^3), -(9*A*E)/(70*l^2), 0,  (36*A*E)/(35*l^3), -(9*A*E)/(70*l^2);
+             0,   (9*A*E)/(70*l^2),                  0, 0,  -(9*A*E)/(70*l^2),    (3*A*E)/(70*l)];
+            
+            
+            T3(:,:,3,2) = [ 0,                  0,                0, 0,                  0,         0;
+             0,  (9*A*E)/(70*l^2),  (3*A*E)/(70*l), 0, -(9*A*E)/(70*l^2),         0;
+             0,    (3*A*E)/(70*l),       -(A*E)/280, 0,   -(3*A*E)/(70*l), (A*E)/280;
+             0,                  0,                0, 0,                  0,         0;
+             0, -(9*A*E)/(70*l^2), -(3*A*E)/(70*l), 0,  (9*A*E)/(70*l^2),         0;
+             0,                  0,        (A*E)/280, 0,                  0, (A*E)/280];
+                        
+            
+            T3(:,:,5,2) = [ 0,                   0,                  0, 0,                   0,                  0;
+             0, -(36*A*E)/(35*l^3), -(9*A*E)/(70*l^2), 0,  (36*A*E)/(35*l^3), -(9*A*E)/(70*l^2);
+             0,  -(9*A*E)/(70*l^2),   -(3*A*E)/(70*l), 0,   (9*A*E)/(70*l^2),                  0;
+             0,                   0,                  0, 0,                   0,                  0;
+             0,  (36*A*E)/(35*l^3),  (9*A*E)/(70*l^2), 0, -(36*A*E)/(35*l^3),  (9*A*E)/(70*l^2);
+             0,  -(9*A*E)/(70*l^2),                  0, 0,   (9*A*E)/(70*l^2),   -(3*A*E)/(70*l)];
+            
+            
+            T3(:,:,6,2) = [ 0,                  0,         0, 0,                  0,                0;
+             0,  (9*A*E)/(70*l^2),         0, 0, -(9*A*E)/(70*l^2),  (3*A*E)/(70*l);
+             0,                  0, (A*E)/280, 0,                  0,        (A*E)/280;
+             0,                  0,         0, 0,                  0,                0;
+             0, -(9*A*E)/(70*l^2),         0, 0,  (9*A*E)/(70*l^2), -(3*A*E)/(70*l);
+             0,    (3*A*E)/(70*l), (A*E)/280, 0,   -(3*A*E)/(70*l),       -(A*E)/280];
+            
+                        
+            
+            T3(:,:,2,3) =[ 0,                  0,                0, 0,                  0,         0;
+             0,  (9*A*E)/(70*l^2),  (3*A*E)/(70*l), 0, -(9*A*E)/(70*l^2),         0;
+             0,    (3*A*E)/(70*l),       -(A*E)/280, 0,   -(3*A*E)/(70*l), (A*E)/280;
+             0,                  0,                0, 0,                  0,         0;
+             0, -(9*A*E)/(70*l^2), -(3*A*E)/(70*l), 0,  (9*A*E)/(70*l^2),         0;
+             0,                  0,        (A*E)/280, 0,                  0, (A*E)/280];
+            
+            
+            T3(:,:,3,3) =[ 0,                0,             0, 0,                0,             0;
+             0,  (3*A*E)/(70*l),    -(A*E)/280, 0, -(3*A*E)/(70*l),     (A*E)/280;
+             0,       -(A*E)/280,   (A*E*l)/35, 0,        (A*E)/280, -(A*E*l)/280;
+             0,                0,             0, 0,                0,             0;
+             0, -(3*A*E)/(70*l),     (A*E)/280, 0,  (3*A*E)/(70*l),    -(A*E)/280;
+             0,        (A*E)/280, -(A*E*l)/280, 0,       -(A*E)/280,  (A*E*l)/420];
+            
+                       
+            
+            T3(:,:,5,3) =[ 0,                  0,                0, 0,                  0,          0;
+             0, -(9*A*E)/(70*l^2), -(3*A*E)/(70*l), 0,  (9*A*E)/(70*l^2),          0;
+             0,   -(3*A*E)/(70*l),        (A*E)/280, 0,    (3*A*E)/(70*l), -(A*E)/280;
+             0,                  0,                0, 0,                  0,          0;
+             0,  (9*A*E)/(70*l^2),  (3*A*E)/(70*l), 0, -(9*A*E)/(70*l^2),          0;
+             0,                  0,       -(A*E)/280, 0,                  0, -(A*E)/280];
+                        
+            T3(:,:,6,3) =[ 0,         0,             0, 0,          0,             0;
+             0,         0,     (A*E)/280, 0,          0,     (A*E)/280;
+             0, (A*E)/280, -(A*E*l)/280, 0, -(A*E)/280,  (A*E*l)/420;
+             0,         0,             0, 0,          0,             0;
+             0,         0,    -(A*E)/280, 0,          0,    -(A*E)/280;
+             0, (A*E)/280,  (A*E*l)/420, 0, -(A*E)/280, -(A*E*l)/280];
+                        
+            
+            
+            T3(:,:,2,5) =[ 0,                   0,                  0, 0,                   0,                  0;
+             0, -(36*A*E)/(35*l^3), -(9*A*E)/(70*l^2), 0,  (36*A*E)/(35*l^3), -(9*A*E)/(70*l^2);
+             0,  -(9*A*E)/(70*l^2),   -(3*A*E)/(70*l), 0,   (9*A*E)/(70*l^2),                  0;
+             0,                   0,                  0, 0,                   0,                  0;
+             0,  (36*A*E)/(35*l^3),  (9*A*E)/(70*l^2), 0, -(36*A*E)/(35*l^3),  (9*A*E)/(70*l^2);
+             0,  -(9*A*E)/(70*l^2),                  0, 0,   (9*A*E)/(70*l^2),   -(3*A*E)/(70*l)];
+            
+            
+            T3(:,:,3,5) =[ 0,                  0,                0, 0,                  0,          0;
+             0, -(9*A*E)/(70*l^2), -(3*A*E)/(70*l), 0,  (9*A*E)/(70*l^2),          0;
+             0,   -(3*A*E)/(70*l),        (A*E)/280, 0,    (3*A*E)/(70*l), -(A*E)/280;
+             0,                  0,                0, 0,                  0,          0;
+             0,  (9*A*E)/(70*l^2),  (3*A*E)/(70*l), 0, -(9*A*E)/(70*l^2),          0;
+             0,                  0,       -(A*E)/280, 0,                  0, -(A*E)/280];
+            
+            
+           
+            
+            T3(:,:,5,5) =[ 0,                   0,                  0, 0,                   0,                  0;
+             0,  (36*A*E)/(35*l^3),  (9*A*E)/(70*l^2), 0, -(36*A*E)/(35*l^3),  (9*A*E)/(70*l^2);
+             0,   (9*A*E)/(70*l^2),    (3*A*E)/(70*l), 0,  -(9*A*E)/(70*l^2),                  0;
+             0,                   0,                  0, 0,                   0,                  0;
+             0, -(36*A*E)/(35*l^3), -(9*A*E)/(70*l^2), 0,  (36*A*E)/(35*l^3), -(9*A*E)/(70*l^2);
+             0,   (9*A*E)/(70*l^2),                  0, 0,  -(9*A*E)/(70*l^2),    (3*A*E)/(70*l)];
+            
+            
+            T3(:,:,6,5) =[ 0,                  0,          0, 0,                  0,                0;
+             0, -(9*A*E)/(70*l^2),          0, 0,  (9*A*E)/(70*l^2), -(3*A*E)/(70*l);
+             0,                  0, -(A*E)/280, 0,                  0,       -(A*E)/280;
+             0,                  0,          0, 0,                  0,                0;
+             0,  (9*A*E)/(70*l^2),          0, 0, -(9*A*E)/(70*l^2),  (3*A*E)/(70*l);
+             0,   -(3*A*E)/(70*l), -(A*E)/280, 0,    (3*A*E)/(70*l),        (A*E)/280];
+            
+            
+            
+            T3(:,:,2,6) =[ 0,                  0,         0, 0,                  0,                0;
+             0,  (9*A*E)/(70*l^2),         0, 0, -(9*A*E)/(70*l^2),  (3*A*E)/(70*l);
+             0,                  0, (A*E)/280, 0,                  0,        (A*E)/280;
+             0,                  0,         0, 0,                  0,                0;
+             0, -(9*A*E)/(70*l^2),         0, 0,  (9*A*E)/(70*l^2), -(3*A*E)/(70*l);
+             0,    (3*A*E)/(70*l), (A*E)/280, 0,   -(3*A*E)/(70*l),       -(A*E)/280];
+            
+            
+            T3(:,:,3,6) =[ 0,         0,             0, 0,          0,             0;
+             0,         0,     (A*E)/280, 0,          0,     (A*E)/280;
+             0, (A*E)/280, -(A*E*l)/280, 0, -(A*E)/280,  (A*E*l)/420;
+             0,         0,             0, 0,          0,             0;
+             0,         0,    -(A*E)/280, 0,          0,    -(A*E)/280;
+             0, (A*E)/280,  (A*E*l)/420, 0, -(A*E)/280, -(A*E*l)/280];
+            
+            
+            
+            T3(:,:,5,6) =[ 0,                  0,          0, 0,                  0,                0;
+             0, -(9*A*E)/(70*l^2),          0, 0,  (9*A*E)/(70*l^2), -(3*A*E)/(70*l);
+             0,                  0, -(A*E)/280, 0,                  0,       -(A*E)/280;
+             0,                  0,          0, 0,                  0,                0;
+             0,  (9*A*E)/(70*l^2),          0, 0, -(9*A*E)/(70*l^2),  (3*A*E)/(70*l);
+             0,   -(3*A*E)/(70*l), -(A*E)/280, 0,    (3*A*E)/(70*l),        (A*E)/280];
+            
+            
+            T3(:,:,6,6) =[ 0,                0,             0, 0,                0,             0;
+             0,  (3*A*E)/(70*l),     (A*E)/280, 0, -(3*A*E)/(70*l),    -(A*E)/280;
+             0,        (A*E)/280,  (A*E*l)/420, 0,       -(A*E)/280, -(A*E*l)/280;
+             0,                0,             0, 0,                0,             0;
+             0, -(3*A*E)/(70*l),    -(A*E)/280, 0,  (3*A*E)/(70*l),     (A*E)/280;
+             0,       -(A*E)/280, -(A*E*l)/280, 0,        (A*E)/280,   (A*E*l)/35];
+            
         end
         
         

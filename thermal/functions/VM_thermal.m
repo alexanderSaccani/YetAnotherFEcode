@@ -39,7 +39,7 @@ for ii = 1:n_configs
     [K_ii,~] = assembly.tangent_stiffness_and_force(eq_ii,T_ii);
     KC_ii = assembly.constrain_matrix(K_ii);
     
-    isKsym = max(max(K_ii-K_ii'));
+    isKsym = max(max(K_ii-K_ii.'))/max(max(K_ii))*100
 
     %compute Vibration Modes for T_ii 
     [VM_ii,omega2_ii] = eigs(KC_ii,MC,n_VMs,'SM'); 
