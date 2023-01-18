@@ -38,8 +38,7 @@ for ii = 1:n_configs
     %compute tangent stiffness matrix at static equilibrium (linearized model)
     [K_ii,~] = assembly.tangent_stiffness_and_force(eq_ii,T_ii);
     KC_ii = assembly.constrain_matrix(K_ii);
-    
-    isKsym = max(max(K_ii-K_ii.'))/max(max(K_ii))*100
+   
 
     %compute Vibration Modes for T_ii 
     [VM_ii,omega2_ii] = eigs(KC_ii,MC,n_VMs,'SM'); 
@@ -56,5 +55,16 @@ for ii = 1:n_configs
     VM{ii} = VM_ii;
 end
 
+%reorder basis to avoid mode veering
+V_ref = VM{1,1};
+
+for ii = 2:n_configs
+    
+    P_ii = (VM{ii})'*V_ref;
+    [L,~,R] = svd(P_ii);
+    Q_ii = L*R';
+    VM{ii} = VM{ii}*Q_ii;
+    
+end
 
 end
