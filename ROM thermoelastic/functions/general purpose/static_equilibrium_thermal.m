@@ -1,5 +1,5 @@
 function [ u_lin, u ] = static_equilibrium_thermal( Assembly, Fext, T, varargin )
-% finds the equilibrium configuration of the model subject to Fext load.
+% finds the equilibrium configuration of the model subject to Fext load and T.
 
 [nsteps,tol,method,displayoption,initialGuess] = parse_inputs(varargin{:});
 

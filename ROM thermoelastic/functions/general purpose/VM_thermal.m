@@ -1,5 +1,5 @@
-
-function [VM,static_eq,omega] = VM_load(assembly,T_samples,eq,n_VMs)
+function [VM,static_eq,omega] = VM_thermal(assembly,T_samples,eq,n_VMs)
+%  Author: Alexander Saccani, pHD candidate ETHZ, 12/2022
 
 %this functions computes the VMs for the structure whose model must be
 %provided in assebmby, for different nodal temperatures configurations (the
@@ -49,7 +49,7 @@ for ii = 1:n_configs
 %         VM_ii(:,jj) = VM_ii(:,jj)/max(sqrt(sum(VM_ii(:,jj).^2,2))); %normalize with respect to max. amplitude
 %     end
 
-% VM_ii = VM_ii./vecnorm(VM_ii); %normalize eigenvectors (they are unitary vectors)
+    VM_ii = VM_ii./vecnorm(VM_ii); %normalize eigenvectors (they are unitary vectors)
     
     VM_ii = assembly.unconstrain_vector(VM_ii); %vibration modes for T_ii
 
@@ -57,15 +57,15 @@ for ii = 1:n_configs
 end
 
 %reorder basis to avoid mode veering
-V_ref = VM{1,1};
+% V_ref = VM{1,1};
 
-for ii = 2:n_configs
-    
-    P_ii = (VM{ii})'*V_ref;
-    [L,~,R] = svd(P_ii);
-    Q_ii = L*R';
-    VM{ii} = VM{ii}*Q_ii;
-    
-end
+% for ii = 2:n_configs
+%     
+%     P_ii = (VM{ii})'*V_ref;
+%     [L,~,R] = svd(P_ii);
+%     Q_ii = L*R';
+%     VM{ii} = VM{ii}*Q_ii;
+%     
+% end
 
 end

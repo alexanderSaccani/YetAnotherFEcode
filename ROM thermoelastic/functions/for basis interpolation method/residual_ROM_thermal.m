@@ -1,13 +1,17 @@
-function [ r, drdqdd,drdqd,drdq, c0] = residual_ROM_thermal_constBasis( q, qd, qdd, t, ROMs, Fext, p_th, T_fn_p)
+function [ r, drdqdd,drdqd,drdq, c0] = residual_ROM_thermal( q, qd, qdd, t, ROMs, Fext, p_th, T_fn_p, u_quasist, time_quasist)
 
 % INPUT: p_th is a function handle of time that s
 %        T_fn_p is a function handle of p_thermal, that describes how the
 %        nodal temperatures vary with p_thermal
 %        ROMs should have fields models, parameters, and fullAssembly
-%        N.B.: in this functions in the first models, it must be stored the
-%        basis corresponding to the cold structure. 
+%        u_quasistatic, is the full quasistatic solution of the dynamic
+%        problem
+%        time_quasist is the time vector of the provided quasistatic solution 
 
-%% Interpolate the thermal equilibrium point
+% full assembly
+fullAssembly = ROMs.fullAssembly;
+
+%% Interpolate the basis and the equilibrium point
 %sample the thermal parameter
 p = p_th(t);
 
@@ -26,23 +30,32 @@ p2 = p_th_samples(ind_p2);
 %compute T(p_th(t))
 T = T_fn_p(p);
 
-% %interpolate basis
-% V1 = ROMs.models{ind_p1}.V;
-% V2 = ROMs.models{ind_p2}.V;
-% V = V1+(p-p1)/(p2-p1)*(V2-V1); %linear interpolation of basis
+%interpolate basis
+V1 = ROMs.models{ind_p1}.V;
+V2 = ROMs.models{ind_p2}.V;
+V = V1+(p-p1)/(p2-p1)*(V2-V1); %linear interpolation of basis
 
-%interpolate full displacement vector at equilibrium
-u_eq1 = ROMs.models{ind_p1}.thermal_eq;
-u_eq2 = ROMs.models{ind_p2}.thermal_eq;
-u_eq = u_eq1+(p-p1)/(p2-p1)*(u_eq2-u_eq1);
+% Interpolate the thermal equilibrium position from constructed ROMs
+% doesn't work
+% interpolation with spline
+% eqq = zeros(size(V,1),length(ROMs.parameters));
+% for ii = 1:length(ROMs)
+%     eqq(:,ii) =  ROMs.models{ii}.thermal_eq;
+% end
+% u_eq = spline(p_th_samples,eqq,p);
 
-%% ROB
-%use constant reduced order basis (corresponding to the VMs and modal
-%derivatives of the cold structure
-V =  ROMs.models{1}.V;
+% %interpolate full displacement vector at equilibrium
+% %linear interpolation from sampled ROMs does not work
+% u_eq1 = ROMs.models{ind_p1}.thermal_eq;
+% u_eq2 = ROMs.models{ind_p2}.thermal_eq;
+% u_eq = u_eq1+(p-p1)/(p2-p1)*(u_eq2-u_eq1);
+
+% interpolate the thermal equilibrium from a quasistatic full solution
+u_eq = interp1(time_quasist.',u_quasist.',t);
+u_eq = u_eq.';
+u_eq = fullAssembly.constrain_vector(u_eq);
 
 %% compute ROM
-fullAssembly = ROMs.fullAssembly;
 M = fullAssembly.constrain_matrix(fullAssembly.DATA.M); %can be more efficient by providing the constrain matrix (then pay attention to ROMs)
 C = fullAssembly.constrain_matrix(fullAssembly.DATA.C);
 
@@ -66,7 +79,10 @@ r = F_inertial + F_damping + F_int_r - F_ext_r;
 drdqdd = Mr;
 drdqd = Cr;
 drdq = Ktgr;
-
-%norm of the residual to end Newton's iterations
+%% 
+% We use the following measure to comapre the norm of the residual $\mathbf{r}$
+% 
+% $$\texttt{c0} = \|\mathbf{M_V}\ddot{\mathbf{q}}\| + \|\mathbf{C_V}\dot{\mathbf{q}}\| 
+% + \|\mathbf{F_V}(\mathbf{q})\| + \|\mathbf{V}^{\top}\mathbf{F}_{ext}(t)\|$$
 c0 = norm(F_inertial) + norm(F_damping) + norm(F_int_r) + norm(F_ext_r);
 end

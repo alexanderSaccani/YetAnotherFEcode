@@ -1,4 +1,6 @@
-%verify natural frequencies of hot temperature beam
+%  author: ALEXANDER SACCANI - PHD CANDIDATE, ETH ZURICH
+
+% verify natural frequencies of hot temperature beam
 % the model considered is a clamped-clamped beam with different
 % temperatures distributions:
 % 1) constant T
@@ -189,17 +191,19 @@ end
 
 %% Thermal VMs analysis 
 
+%% define T distribution
+
 % %constant T
 % T_dyn_p = @(T_ampl) T_ampl; % field parametrized with thermal amplitude
-% p_sampl = [0;5;10;30]; 
+% p_sampl_T = [0;5;10;30]; 
 
 % %ramp
 % T_dyn_p = @(T_ampl) T_ampl/l*nodes_x; %field parametrized with thermal amplitude at right end
-% p_sampl = [5;10;15;20]; 
+% p_sampl_T = [5;10;15;20]; 
 
 % %parabola
 % T_dyn_p = @(T_ampl) -4*T_ampl/l^2*nodes_x.^2 + 4*T_ampl/l*nodes_x; %field parametrized with thermal amplitude at midspan
-% p_sampl = [0;20]; 
+% p_sampl_T = [0;20]; 
 
 % % sine pulse
 % T_ampl = 100; %width of thermal pulse
@@ -207,26 +211,50 @@ end
 % x0 = @(xc) xc - p/2; %left extreme of pulse
 % T_dyn_p = @(xc) T_ampl*(sin(pi*(nodes_x-x0(xc))/p)).^2.*(heaviside(nodes_x-x0(xc)) - ...
 %     heaviside((nodes_x-x0(xc))-p)); %define the temperature as a function of xc only (T profile parametrized with xc
-% p_sampl = [-p/2;0;0.01;0.05;0.085;0.1]; % field parametrized with xc (centre of pulse)
+% p_sampl_T = [-p/2;0;0.01;0.05;0.085;0.1]; % field parametrized with xc (centre of pulse)
 
 %half beam cold - half hot
-perc_hot = 80;
+perc_hot = 0;
 T_dyn_p = @(T_ampl) T_ampl*(1 - heaviside(nodes_x - (perc_hot/100)*l));
-p_sampl = [0,5,10,50];
+p_sampl_T = [0,0,0,0];
 
-T_sampl = zeros(nNodes,length(p_sampl)); % T nodal distribution samples
+
+%% define load distribution
+
+% load varying location (same magnitude)
+% F_mag = 1;%1.2e1;
+% dof = 2; % set dof to: 1 for horizontal load, 2 for vertical load, 3 for moment
+% y_F = 0;
+% F_dyn_p = @(x_F) F_conc(x_F,y_F,F_mag,dof,nDofsF,Nodes,nDofPerNode);
+% p_sampl_F_perc = [0,10,20,30,45];
+% p_sampl_F = p_sampl_F_perc/100*l;
+
+%load varying magnitude (same location)
+x_F_perc = 2;
+x_F = x_F_perc*l/100;
+dof = 1; % set dof to: 1 for horizontal load, 2 for vertical load, 3 for moment
+y_F = 0;
+F_dyn_p = @(F_mag) F_conc(x_F,y_F,F_mag,dof,nDofsF,Nodes,nDofPerNode);
+p_sampl_F = [0, 1e3, 2e3, 20e3];
+
+%% compute VMs for different configurations
+
+T_sampl = zeros(nNodes,length(p_sampl_T)); % T nodal distribution samples
+F_sampl = zeros(nDofsF,length(p_sampl_F)); % T nodal distribution samples
 
 %generate corresponding temperature profiles
-for ii = 1:length(p_sampl)
-    T_sampl(:,ii) = T_dyn_p(p_sampl(ii));
+for ii = 1:length(p_sampl_T)
+    T_sampl(:,ii) = T_dyn_p(p_sampl_T(ii));
+    F_sampl(:,ii) = F_dyn_p(p_sampl_F(ii));
 end
 
 VMs_at_eq = 1; %do you want to compute VMs at thermal equilibrium? (set to 1 if yes, otherwise set to 0)
-[VMs,static_eq,omega] = VM_thermal(BeamAssembly,T_sampl,VMs_at_eq,5);
+[VMs,static_eq,omega] = VM_temp_load(BeamAssembly,T_sampl,F_sampl,VMs_at_eq,5);
 
+%% plot
 %plot VMs__________________________________________________________________
-T_sampl_2_plot = 1:length(p_sampl);
-mode2plot = [1,2,3,4,5];
+T_sampl_2_plot = 1:length(p_sampl_T);
+mode2plot = [1,2];
 
 %T distribution 
 figure('units','normalized','position',[.3 .3 .4 .4]); hold on;
@@ -272,8 +300,23 @@ for ii = 1:length(T_sampl_2_plot)
    ueq_ii = reshape(static_eq(:,ii),nDofPerNode,[]).';
    subplot 313; hold on;
    plot(nodes_x + scl*ueq_ii(:,1), nodes_y + scl*ueq_ii(:,2),'*-'); 
-   xlabel('x [m]'); ylabel('deformation')
+   xlabel('x [m]'); ylabel(['deformation *',num2str(scl)])
 end
 
 disp('natural frequencies are [cycles/s]: (row -> VM, column -> T distribution)');
 disp(omega/(2*pi));
+
+
+%% functions
+%concentrated load at arbitrary position
+function F_conc_out = F_conc(x_F,y_F,F_mag,dof,nDofsF,Nodes,nDofPerNode) 
+
+%initialize Nodal force
+F_conc_out = zeros(nDofsF,1);  %concentrated load
+
+% concentrated load of magnitude F_mag at location x_F
+fext_node = find_node(x_F,y_F,[],Nodes); % node where to put the force
+fext_dofs = get_index(fext_node, nDofPerNode);
+F_conc_out(fext_dofs(dof)) = F_mag;
+
+end

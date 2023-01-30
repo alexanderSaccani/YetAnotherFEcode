@@ -1,8 +1,8 @@
-% ALEXANDER SACCANI - PHD CANDIDATE, ETH ZURICH, 
+% author: ALEXANDER SACCANI - PHD CANDIDATE, ETH ZURICH, 
 % created: 1.12.2022
-% last modified: 1.12.2022
+% last modified: 30.01.2023
 
-% Straight temperature dependent beam template
+% Straight beam clamped at both ends
 
 clearvars ; close all; clc
 %% Define colors for plots
@@ -70,7 +70,7 @@ M_C = BeamAssembly.constrain_matrix(M);
 
 %% Modal Analysis of the cold structure
 
-n_VMs = 3; % first n_VMs modes with lowest frequency calculated 
+n_VMs = 5; % first n_VMs modes with lowest frequency calculated 
 
 [VM,omega2] = eigs(K_C,M_C,n_VMs,'SM'); 
 omega = sqrt(diag(omega2));
@@ -114,13 +114,13 @@ end
 % Nodal force
 F_c = zeros(nDofsF,1);  %concentrated load
 
-% transverse load at midspan
+% transverse load 
 fext_node = find_node(l/2,0,[],Nodes); % node where to put the force
 fext_dofs = get_index(fext_node, nDofPerNode);
-F_c(fext_dofs(2)) = 3e2;%3e3;%4e3; %5e3
+F_c(fext_dofs(2)) = 3e2; 
 
 %uniform body force
-Pressure_v = 0; %0.5e4;%1e2; % load per unit length in the transversal direction
+Pressure_v = 0; 
 F_v_uniform = Pressure_v*BeamAssembly.uniform_body_force();
 F_v_uniform(1:3:end) = F_v_uniform(1:3:end)*0; %set to 0 the forces corresponding to the axial dofs. (no axial pressure)
 
@@ -129,8 +129,8 @@ F = F_c + F_v_uniform;
 
 %% Static Analysis 
 % Define static thermal sin^2 distribution
-T_ampl = 100;
-p = l/10; %width of thermal pulse
+T_ampl = 30;
+p = l/4; %width of thermal pulse
 
 xc_st = l/2; %center of thermal pulse
 x0_st = xc_st - p/2; %left extreme of pulse
@@ -152,24 +152,24 @@ scl = 50;   %scaling factor
 
 figure('units','normalized','position',[.1 .1 .8 .8])
 subplot 411; 
-plot(nodes_x,T_st); xlabel('x [m]'); ylabel('T [K]'); 
+plot(nodes_x,T_st,'linewidth',2); xlabel('x [m]'); ylabel('T [K]'); 
 title('Static analysis. T distribution')
 
 subplot 412; 
-plot(nodes_x,static.nlin(:,1),'color','r'); hold on;
-plot(nodes_x,static.lin(:,1),'--', 'color','cyan')
-xlabel('x [m]'); ylabel('u [m]'); title('long. displ');legend('nonlinear','linear')
+plot(nodes_x,static.nlin(:,1),'color','r','linewidth',2); hold on;
+plot(nodes_x,static.lin(:,1),'--', 'color','cyan','linewidth',2)
+xlabel('x [m]'); ylabel('u [m]'); title('long. displ');legend('nonlinear','linear','linewidth',2)
 
 subplot 413; 
-plot(nodes_x,static.nlin(:,2),'color','r'); hold on;
-plot(nodes_x,static.lin(:,2),'--', 'color','cyan');
-xlabel('x [m]'); ylabel('v [m]'); title('tranv. displ'); legend('nonlinear','linear')
+plot(nodes_x,static.nlin(:,2),'color','r','linewidth',2); hold on;
+plot(nodes_x,static.lin(:,2),'--', 'color','cyan','linewidth',2);
+xlabel('x [m]'); ylabel('v [m]'); title('tranv. displ'); legend('nonlinear','linear','linewidth',2)
 
 subplot 414; 
-plot(nodes_x,nodes_y,'.-','markersize',10,'color','b'); hold on;
-plot(nodes_x + scl*static.nlin(:,1), nodes_y + scl*static.nlin(:,2), '.-', 'markersize',10,'color','r')
-plot(nodes_x + scl*static.lin(:,1), nodes_y + scl*static.lin(:,2), '--', 'color','cyan')
-title('static deformation shape'); xlabel('x [m]'); legend('undeformed','nonlinear','linear')
+plot(nodes_x,nodes_y,'.-','markersize',10,'color','b','linewidth',2); hold on;
+plot(nodes_x + scl*static.nlin(:,1), nodes_y + scl*static.nlin(:,2), '.-', 'markersize',10,'color','r','linewidth',2)
+plot(nodes_x + scl*static.lin(:,1), nodes_y + scl*static.lin(:,2), '--', 'color','cyan','linewidth',2)
+title('static deformation shape'); xlabel('x [m]'); legend('undeformed','nonlinear','linear','linewidth',2)
 
 
 %% Dynamic response using Implicit Newmark
@@ -182,11 +182,11 @@ T_fext = 2*pi/om_fext; % period of ex. forcing
 F_ext = @(t) F*sin(om_fext*t);
 
 %define thermal load 
-T_ampl = 100;
-p = l/10; %width of thermal pulse
+T_ampl = 30;
+p = l/4; %width of thermal pulse
 A = l+p;  %amplitude of oscillation of pulse
 xci = -p/2; %center location at initial time
-eps = 0.005; %om_fex/om_th (th = thermal forcing)
+eps = 0.01; %om_fex/om_th (th = thermal forcing)
 om_th = eps*om_fext;  % angular frequency of thermal mode oscillation in time
 
 T_th = 2*pi/om_th; % period of temp. oscillations
@@ -198,18 +198,18 @@ T_dyn_xc = @(xc) T_ampl*(sin(pi*(nodes_x-x0(xc))/p)).^2.*(heaviside(nodes_x-x0(x
 xc_dyn = @(t) xci + A*sin(om_th*t); %define how center of pulse xc variates in time
 T_dyn_t = @(t) T_dyn_xc(xc_dyn(t)); %evaluate the temperature profile in time
 
-% %plot temperature profile (animation)
-% time = linspace(0,T_th/4,100);
-% figure
-% for ii = 1:length(time)
-%     plot(nodes_x,T_dyn_t(time(ii)));
-%     axis([0,l,0,T_ampl]);
-%     pause(0.03);
-% end
+%plot temperature profile (animation)
+time = linspace(0,T_th/4,100);
+figure
+for ii = 1:length(time)
+    plot(nodes_x,T_dyn_t(time(ii)));
+    axis([0,l,0,T_ampl]);
+    pause(0.03);
+end
 
 % Integrate linearized model_______________________________________________
 % settings for integration
-tmax = T_th/4; % integration interval
+tint = T_th/4; % integration interval
 h = T_fext/50; % time step for integration
 
 % Precompute data for Assembly object
@@ -230,7 +230,7 @@ residual = @(q,qd,qdd,t)residual_thermal_linear(q,qd,qdd,t,...
     BeamAssembly, F_ext, T_dyn_t);
 
 % integrate equations with Newmark scheme
-TI_LIN.Integrate(q0,qd0,qdd0,tmax,residual);
+TI_LIN.Integrate(q0,qd0,qdd0,tint,residual);
 
 % store solution in more suitable array (only displacements)
 u_dyn = BeamAssembly.unconstrain_vector(TI_LIN.Solution.q); 
@@ -239,7 +239,7 @@ dyn.lin.time = TI_LIN.Solution.time;
 
 % Integrate nonlinear EOM__________________________________________________
 % settings for integration
-tmax = T_th/4; % integration interval
+tint = T_th/4; % integration interval
 h = T_fext/50; % time step for integration
 
 % Precompute data for Assembly object
@@ -255,7 +255,7 @@ residual = @(q,qd,qdd,t)residual_thermal_nonlinear(q,qd,qdd,t,...
     BeamAssembly,F_ext, T_dyn_t);
 
 % integrate equations with Newmark scheme
-TI_NL.Integrate(q0,qd0,qdd0,tmax,residual);
+TI_NL.Integrate(q0,qd0,qdd0,tint,residual);
 
 % store solution in more suitable array (only displacements)
 u_dyn = BeamAssembly.unconstrain_vector(TI_NL.Solution.q); 
@@ -263,37 +263,34 @@ dyn.nlin.disp = decodeDofsNodes(u_dyn,nNodes,nDofPerNode); % (node, dof of node,
 dyn.nlin.time = TI_NL.Solution.time;
 
 % Quasistatic Solution_____________________________________________________
-dyn.quasistatic.time = linspace(0,tmax,1e2); %define time vector
+dyn.quasistatic.time = linspace(0,tint,1e2); %define time vector
 u_quasist = quasistatic_solution( BeamAssembly, T_dyn_t, dyn.quasistatic.time ); %compute quasistatic solution (F=0)
 dyn.quasistatic.disp = decodeDofsNodes(u_quasist,nNodes,nDofPerNode); % (node, dof of node, tsamp)
 
 % plot results of nonlinear dynamic analysis_______________________________
 plot_dof_location = 0.3; %percentage of length of beam
-node2plot = find_node(plot_dof_location*l,0,[],Nodes); % node where to put the force
+node2plot = find_node(plot_dof_location*l,0,[],Nodes); % node to plot
 
 figure('units','normalized','position',[.1 .1 .8 .8]);
 subplot 311; hold on;
-plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,1,:)),'-','color','r');
-plot(dyn.lin.time,squeeze(dyn.lin.disp(node2plot,1,:)),'--','color','cyan');
-plot(dyn.quasistatic.time,squeeze(dyn.quasistatic.disp(node2plot,1,:)),'--','color','green');
-xlabel('t [s]'); ylabel('u [m]'); grid on; axis tight;  legend('nonlinear','linear','quasistatic');
+plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,1,:)),'-','color','r','linewidth',2);
+plot(dyn.lin.time,squeeze(dyn.lin.disp(node2plot,1,:)),'--','color','cyan','linewidth',2);
+plot(dyn.quasistatic.time,squeeze(dyn.quasistatic.disp(node2plot,1,:)),'--','color','green','linewidth',2);
+xlabel('t [s]'); ylabel('u [m]'); grid on; axis tight;  legend('nonlinear','linear','quasistatic','linewidth',2);
 
 subplot 312; hold on;
-plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,2,:)),'-','color','r');
-plot(dyn.lin.time,squeeze(dyn.lin.disp(node2plot,2,:)),'--','color','cyan');
-plot(dyn.quasistatic.time,squeeze(dyn.quasistatic.disp(node2plot,2,:)),'--','color','green');
-xlabel('t [s]'); ylabel('v [m]'); grid on; axis tight; legend('nonlinear','linear','quasistatic');
+plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,2,:)),'-','color','r','linewidth',2);
+plot(dyn.lin.time,squeeze(dyn.lin.disp(node2plot,2,:)),'--','color','cyan','linewidth',2);
+plot(dyn.quasistatic.time,squeeze(dyn.quasistatic.disp(node2plot,2,:)),'--','color','green','linewidth',2);
+xlabel('t [s]'); ylabel('v [m]'); grid on; axis tight; legend('nonlinear','linear','quasistatic','linewidth',2);
 
 subplot 313; hold on;
-plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,3,:)),'-','color','r');
-plot(dyn.lin.time,squeeze(dyn.lin.disp(node2plot,3,:)),'--','color','cyan');
-plot(dyn.quasistatic.time,squeeze(dyn.quasistatic.disp(node2plot,3,:)),'--','color','green');
+plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,3,:)),'-','color','r','linewidth',2);
+plot(dyn.lin.time,squeeze(dyn.lin.disp(node2plot,3,:)),'--','color','cyan','linewidth',2);
+plot(dyn.quasistatic.time,squeeze(dyn.quasistatic.disp(node2plot,3,:)),'--','color','green','linewidth',2);
 xlabel('t [s]'); ylabel('w [-]'); grid on; axis tight;  legend('nonlinear','linear','quasistatic');
 
-% plot time history at different locations on the beam... do it in future
-
-% %% plot results in time__________________________________________________
-% 
+ %% plot results in time (animation)______________________________________
 % time_tmp = dyn.nlin.time; % time vec.
 % u_tmp = squeeze(dyn.nlin.disp(:,1,:)); % long. displ.
 % v_tmp = squeeze(dyn.nlin.disp(:,2,:)); % tranv. displ.
@@ -308,13 +305,14 @@ xlabel('t [s]'); ylabel('w [-]'); grid on; axis tight;  legend('nonlinear','line
 % u_ax_bounds = [0,l,1.1*min(min(u_tmp)),1.1*max(max(u_tmp))];
 % v_ax_bounds = [0,l,1.1*min(min((v_tmp))),1.1*max(max(v_tmp))];
 % 
+% 
 % figure('units','normalized','position',[.1 .1 .8 .8]);
 % for ii = 1:length(time_tmp)
 %    
 %    time_ii = time_tmp(ii);
 %    
 %    subplot 311
-%    plot(nodes_x,T_dyn(time_tmp(ii)));
+%    plot(nodes_x,T_dyn_t(time_tmp(ii)));
 %    axis([0,l,0,T_ampl]);
 %    xlabel('x'); ylabel('T');
 %    
@@ -332,10 +330,40 @@ xlabel('t [s]'); ylabel('w [-]'); grid on; axis tight;  legend('nonlinear','line
 %    pause(0.001);
 %    
 % end
+% 
+% scl = 20; %scale factor
+% def_ax_bounds = [0,l,1.1*(min(min((scl*v_tmp)))-min(nodes_y)),...
+%     1.1*(max(max(scl*v_tmp))+max(nodes_y))];
+% 
+% figure('units','normalized','position',[.1 .1 .8 .8]);
+% for ii = 1:length(time_tmp)
+%     
+%     time_ii = time_tmp(ii);
+%     
+%     subplot 211
+%     plot(nodes_x,T_dyn_t(time_tmp(ii)),'linewidth',1.5,'color','r');
+%     axis([0,l,0,T_ampl]);
+%     xlabel('x [m]'); ylabel('T [K]');
+%     title('temperature profile')
+% 
+%     subplot 212
+%     plot(nodes_x + scl*u_tmp(:,ii), nodes_y + scl*v_tmp(:,ii), 'marker', '.','markersize',10,'color','b','linewidth',1.5 );
+%     hold on;
+%     
+%     plot(nodes_x, nodes_y, 'marker', '.','color','k' ,'linewidth',1.5,'markersize',10);
+%     axis(def_ax_bounds)
+%     xlabel('x [m]'); ylabel('y [m]');
+%     title(['arc vibration, time ', num2str(round(time_ii,4)),' s, scale factor: ',num2str(scl) ])
+%     legend('deformed','undeformed')
+%     
+%     pause(0.001);
+%     
+%     hold off;
+% end
+
 
 %% Thermal VMs analysis (just to visualize them)
 xc_sampl = [-p/2;linspace(p/2,l-p/2,3)']; %sample locations of center thermal pulse
-%xc_sampl = [-p/2;0;0.01;0.05;0.085;0.1];
 
 T_sampl = zeros(nNodes,length(xc_sampl)); % T nodal distribution samples
 
@@ -426,7 +454,6 @@ ROMs.models = multiple_ROMs_thermal(BeamAssembly, T_sampl, number_VMs);
 
 %% Integrate nonlinear ROM (Varying basis)
 % settings for integration
-tmax = T_th/4; % integration interval
 h = T_fext/50; % time step for integration
 
 % Initial condition: equilibrium
@@ -440,22 +467,22 @@ qdd0 = zeros(n_dof_r,1);
 TI_NL_r = ImplicitNewmark('timestep',h,'alpha',0.005);
 
 % nonlinear Residual evaluation function handle
-residual_r = @(q,qd,qdd,t)residual_ROM_thermal(q,qd,qdd,t,ROMs,F_ext,xc_dyn,T_dyn_xc);
+residual_r = @(q,qd,qdd,t)residual_ROM_thermal(q,qd,qdd,t,ROMs,F_ext,xc_dyn,T_dyn_xc,u_quasist,dyn.quasistatic.time);
 
 % integrate equations with Newmark scheme
-TI_NL_r.Integrate(q0,qd0,qdd0,tmax,residual_r);
+TI_NL_r.Integrate(q0,qd0,qdd0,tint-1e-3*tint,residual_r);
 
 % postprocess output 
-u_dyn_r = reduced_to_full_thermal(TI_NL_r.Solution.q,TI_NL_r.Solution.time,ROMs,xc_dyn,1:nDofsC);
+u_dyn_r = reduced_to_full_thermal(TI_NL_r.Solution.q,TI_NL_r.Solution.time,ROMs,xc_dyn,u_quasist,dyn.quasistatic.time);
 
 u_dyn_r = BeamAssembly.unconstrain_vector(u_dyn_r); 
 dyn_r.nlin.disp = decodeDofsNodes(u_dyn_r,nNodes,nDofPerNode); % (node, dof of node, tsamp)
 dyn_r.nlin.time = TI_NL_r.Solution.time;
 
-% %quasistatic response
-% u_qs = quasistatic_from_ROMs(TI_NL_r.Solution.time,ROMs,xc_dyn);
-% u_qs = BeamAssembly.unconstrain_vector(u_qs);
-% u_qs = decodeDofsNodes(u_qs,nNodes,nDofPerNode);
+%quasistatic response
+u_qs = quasistatic_from_ROMs(dyn.nlin.time,ROMs,xc_dyn);
+u_qs = BeamAssembly.unconstrain_vector(u_qs);
+u_qs = decodeDofsNodes(u_qs,nNodes,nDofPerNode);
 
 %% Integrate nonlinear ROM (constant basis)
 
@@ -470,7 +497,6 @@ for ii = 1:n_ROMs
 end
 
 % settings for integration
-tmax = T_th/4; % integration interval
 h = T_fext/50; % time step for integration
 
 % Initial condition: equilibrium
@@ -484,13 +510,13 @@ qdd0 = zeros(n_dof_r,1);
 TI_NL_r_cbasis = ImplicitNewmark('timestep',h,'alpha',0.005);
 
 % nonlinear Residual evaluation function handle
-residual_r_cbasis = @(q,qd,qdd,t)residual_ROM_thermal(q,qd,qdd,t,ROMs_cbasis,F_ext,xc_dyn,T_dyn_xc);
+residual_r_cbasis = @(q,qd,qdd,t)residual_ROM_thermal(q,qd,qdd,t,ROMs_cbasis,F_ext,xc_dyn,T_dyn_xc,u_quasist,dyn.quasistatic.time);
 
 % integrate equations with Newmark scheme
-TI_NL_r_cbasis.Integrate(q0,qd0,qdd0,tmax,residual_r_cbasis);
+TI_NL_r_cbasis.Integrate(q0,qd0,qdd0,tint-1e-3*tint,residual_r_cbasis);
 
 % postprocess output 
-u_dyn_r_cbasis = reduced_to_full_thermal(TI_NL_r_cbasis.Solution.q,TI_NL_r_cbasis.Solution.time,ROMs_cbasis,xc_dyn,1:nDofsC);
+u_dyn_r_cbasis = reduced_to_full_thermal(TI_NL_r_cbasis.Solution.q,TI_NL_r_cbasis.Solution.time,ROMs_cbasis,xc_dyn,u_quasist,dyn.quasistatic.time);
 
 u_dyn_r_cbasis = BeamAssembly.unconstrain_vector(u_dyn_r_cbasis); 
 dyn_r_cb.nlin.disp = decodeDofsNodes(u_dyn_r_cbasis,nNodes,nDofPerNode); % (node, dof of node, tsamp)
@@ -498,9 +524,47 @@ dyn_r_cb.nlin.time = TI_NL_r_cbasis.Solution.time;
 
 %% Plot comparison
 % plot results of nonlinear dynamic analysis_______________________________
-plot_dof_location = 0.3; %percentage of beam length
+plot_dof_location = 0.25; %percentage of beam length
 node2plot = find_node(plot_dof_location*l,0,[],Nodes); % node where to put the force
 plot_dof = get_index(node2plot, BeamAssembly.Mesh.nDOFPerNode );
+
+figure('units','normalized','position',[.1 .1 .8 .8]); 
+subplot 311; hold on;
+plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,1,:)),'-','color','r','linewidth',2);
+plot(dyn_r.nlin.time,squeeze(dyn_r.nlin.disp(node2plot,1,:)),'--','color','b','linewidth',2);
+plot(dyn_r_cb.nlin.time,squeeze(dyn_r_cb.nlin.disp(node2plot,1,:)),'-.','color','m','linewidth',2);
+plot(dyn.lin.time,squeeze(dyn.lin.disp(node2plot,1,:)),'--','color','cyan','linewidth',2);
+plot(dyn.quasistatic.time,squeeze(dyn.quasistatic.disp(node2plot,1,:)),'--','color','g','linewidth',2);
+plot(dyn.nlin.time,squeeze(u_qs(node2plot,1,:)),'--','color','k','linewidth',1.5)
+xlabel('t [s]'); ylabel('u [m]'); grid on; axis tight; legend('full','ROM','ROM const V','lin','quasistatic','exp point');
+title(['comparison of ROM and HFM solutions, dof at ',num2str(plot_dof_location*100), '% of beam length'])
+
+subplot 312; hold on;
+plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,2,:)),'-','color','r','linewidth',2);
+plot(dyn_r.nlin.time,squeeze(dyn_r.nlin.disp(node2plot,2,:)),'--','color','b','linewidth',2);
+plot(dyn_r_cb.nlin.time,squeeze(dyn_r_cb.nlin.disp(node2plot,2,:)),'-.','color','m','linewidth',2);
+plot(dyn.lin.time,squeeze(dyn.lin.disp(node2plot,2,:)),'--','color','cyan','linewidth',2);
+plot(dyn.quasistatic.time,squeeze(dyn.quasistatic.disp(node2plot,2,:)),'--','color','g','linewidth',2);
+plot(dyn.nlin.time,squeeze(u_qs(node2plot,2,:)),'--','color','k','linewidth',1.5)
+xlabel('t [s]'); ylabel('v [m]'); grid on; axis tight; legend('full','ROM','ROM const V','lin','quasistatic','exp point');
+
+subplot 313; hold on;
+plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,3,:)),'-','color','r','linewidth',2);
+plot(dyn_r.nlin.time,squeeze(dyn_r.nlin.disp(node2plot,3,:)),'--','color','b','linewidth',2);
+plot(dyn_r_cb.nlin.time,squeeze(dyn_r_cb.nlin.disp(node2plot,3,:)),'-.','color','m','linewidth',2);
+plot(dyn.lin.time,squeeze(dyn.lin.disp(node2plot,3,:)),'--','color','cyan','linewidth',2);
+plot(dyn.quasistatic.time,squeeze(dyn.quasistatic.disp(node2plot,3,:)),'--','color','g','linewidth',2);
+plot(dyn.nlin.time,squeeze(u_qs(node2plot,3,:)),'--','color','k','linewidth',1.5)
+xlabel('t [s]'); ylabel('w [-]'); grid on; axis tight; legend('full','ROM','ROM const V','lin','quasistatic','exp point');
+
+
+
+
+
+
+
+
+return
 
 figure('units','normalized','position',[.1 .1 .8 .8]); 
 subplot 311; hold on;

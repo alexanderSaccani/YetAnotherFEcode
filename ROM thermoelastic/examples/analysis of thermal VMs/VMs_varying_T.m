@@ -1,4 +1,6 @@
-%verify natural frequencies of hot temperature beam
+% author: ALEXANDER SACCANI - PHD CANDIDATE, ETH ZURICH
+
+% verify natural frequencies of hot temperature beam
 % the model considered is a clamped-clamped beam with different
 % temperatures distributions:
 % 1) constant T
@@ -9,7 +11,7 @@ close all
 clc
 clearvars
 
-model = 'straightbeam'; %valid options are : 'straightbeam' or 'arc'
+model = 'arc'; %valid options are : 'straightbeam' or 'arc'
 
 if strcmp(model,'straightbeam')
     
@@ -203,16 +205,21 @@ end
 
 % % sine pulse
 % T_ampl = 100; %width of thermal pulse
-% p = 1e-2; %width of sine pulse
+% p = 3e-2; %width of sine pulse
 % x0 = @(xc) xc - p/2; %left extreme of pulse
 % T_dyn_p = @(xc) T_ampl*(sin(pi*(nodes_x-x0(xc))/p)).^2.*(heaviside(nodes_x-x0(xc)) - ...
 %     heaviside((nodes_x-x0(xc))-p)); %define the temperature as a function of xc only (T profile parametrized with xc
-% p_sampl = [-p/2;0;0.01;0.05;0.085;0.1]; % field parametrized with xc (centre of pulse)
+% %p_sampl = [-p/2;0;0.01;0.05;0.085;0.1]; % field parametrized with xc (centre of pulse)
+% nsampls = 4;
+% p_sampl = [-p/2,l/nsampls:l/nsampls:l].';
 
 %half beam cold - half hot
 perc_hot = 80;
 T_dyn_p = @(T_ampl) T_ampl*(1 - heaviside(nodes_x - (perc_hot/100)*l));
 p_sampl = [0,5,10,50];
+
+
+
 
 T_sampl = zeros(nNodes,length(p_sampl)); % T nodal distribution samples
 
@@ -225,6 +232,7 @@ VMs_at_eq = 1; %do you want to compute VMs at thermal equilibrium? (set to 1 if 
 [VMs,static_eq,omega] = VM_thermal(BeamAssembly,T_sampl,VMs_at_eq,5);
 
 %plot VMs__________________________________________________________________
+color_list = {'#0072BD','#D95319','#EDB120','#7E2F8E','#77AC30','#4DBEEE'};
 T_sampl_2_plot = 1:length(p_sampl);
 mode2plot = [1,2,3,4,5];
 
@@ -247,7 +255,8 @@ for ii = 1:length(mode2plot)
         VM_iijj = decodeDofsNodes(VMs{jj}(:,VM2pl),nNodes,nDofPerNode);
         v_ii = VM_iijj(:,2); %tranverse displ.
         u_ii = VM_iijj(:,1); %long. displ.
-        plot(nodes_x + u_ii, nodes_y + v_ii,'.-','markersize',10)
+        plot(nodes_x + u_ii, nodes_y + v_ii,'.-','markersize',10,'color',color_list{jj}); hold on;
+        plot(nodes_x - u_ii, nodes_y - v_ii,'.-','markersize',10,'color',color_list{jj}); hold on;
     end
 
 end

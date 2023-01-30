@@ -36,14 +36,14 @@
 
 function [MD, names] = modal_derivatives_thermal(myAssembly, elements, d_eq, Phi, T, USEJULIA)
 
-if nargin < 4
+if nargin < 6
     USEJULIA = 0;
 end
 
 n = size(Phi,1);
 n_VMs = size(Phi,2);
 
-K0 = myAssembly.DATA.K;
+[K0,~] = myAssembly.tangent_stiffness_and_force(d_eq,T);
 K0 = myAssembly.constrain_matrix( K0 );
 
 MD = zeros(n, n_VMs*(n_VMs+1)/2);

@@ -65,7 +65,16 @@ elseif dimension == 2           % For 2D plots
         Y = Nodes(Elements',2); Y = reshape(Y, nnel, nel);
         p{ee} = patch(X,Y,'w','DisplayName','Mesh');
     else % line
-        p{ee}=plot(Nodes(:,1),Nodes(:,2),'.-k', 'Markersize',10);
+%         p{ee}=plot(Nodes(:,1),Nodes(:,2),'.-k', 'Markersize',10);
+        Adj_m = zeros(size(Nodes,1)); %adjacent matrix
+        for ii = 1:size(Elements,1)
+            jj = Elements(ii,1);
+            kk = Elements(ii,2);
+            Adj_m(jj,kk) = 1;
+            Adj_m(kk,jj) = 1;
+        end
+        [x,y] = gplot(Adj_m,Nodes);
+        p{ee} = plot(x,y,'.-k', 'Markersize',10);
     end
     
 end

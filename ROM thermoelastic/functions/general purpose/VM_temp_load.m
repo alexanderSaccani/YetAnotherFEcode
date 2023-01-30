@@ -1,0 +1,81 @@
+
+function [VM,static_eq,omega] = VM_temp_load(assembly,T_samples,Load_samples,eq,n_VMs)
+%  Author: Alexander Saccani, pHD candidate ETHZ, 12/2022
+
+%this functions computes the VMs for the structure whose model must be
+%provided in assebmby, for different nodal temperatures and load samples configurations (the
+%ones that are stored respectively in vector T_samples and Load_samples). 
+%VMs can be computed around the undeformed configuration (if eq == 0 ) or
+%with respect to the deformed by temperature static configuration (if eq == 1). 
+%In this case the output provides also the static deformation.
+
+%check input
+if ~(size(T_samples,2) == size(Load_samples,2))
+    error('Temperature samples must be equal to Load samples provided')
+end
+
+n_configs = size(T_samples,2);
+
+nDofsF = assembly.Mesh.nDOFs; 
+
+M = mass_matrix(assembly);
+MC = assembly.constrain_matrix(M);
+
+%initialize output
+VM = cell(n_configs,1);
+static_eq = zeros(nDofsF,n_configs);
+omega = zeros(n_VMs,n_configs);
+
+for ii = 1:n_configs
+    %temperature distribution T_ii
+    T_ii = T_samples(:,ii);
+    F_ii = Load_samples(:,ii);
+    
+    if eq == 0
+        eq_ii = zeros(nDofsF,1);
+    else
+        %compute static equilibrium
+        [K_ii,~] = assembly.tangent_stiffness_and_force(F_ii,T_ii); %optimizable
+        assembly.DATA.K = K_ii;    % this value of K is used only for first guess solution (T not considered in the linear guess!)
+        [~,eq_ii] = static_equilibrium_thermal(assembly, F_ii, T_ii); %not super efficient since it computes also the linear solution
+    end
+
+    static_eq(:,ii) = eq_ii; %static equilibrium
+
+    %compute tangent stiffness matrix at static equilibrium (linearized model)
+    [K_ii,~] = assembly.tangent_stiffness_and_force(eq_ii,T_ii);
+    KC_ii = assembly.constrain_matrix(K_ii);
+   
+
+    %compute Vibration Modes for T_ii 
+    [VM_ii,omega2_ii] = eigs(KC_ii,MC,n_VMs,'SM'); 
+    omega(:,ii) = sqrt(diag(omega2_ii));
+
+
+    VM_ii = VM_ii./vecnorm(VM_ii); %normalize eigenvectors (they are unitary vectors)
+    
+    VM_ii = assembly.unconstrain_vector(VM_ii); %vibration modes for T_ii
+
+    VM{ii} = VM_ii;
+end
+
+% %reorder basis to avoid mode veering
+% %by referring all the basis to the same ref basis it is possible to check
+% %how much the space spanned by different basis changes.
+%
+% for ii = 1:n_configs
+%   VM{ii} = orth(VM{ii});
+% end
+%
+% V_ref = VM{1,1};
+% 
+% for ii = 2:n_configs
+%     
+%     P_ii = (VM{ii})'*V_ref;
+%     [L,~,R] = svd(P_ii);
+%     Q_ii = L*R';
+%     VM{ii} = VM{ii}*Q_ii;
+%     
+% end
+
+end

@@ -133,7 +133,17 @@ elseif dimension == 2           % For 2D plots
         h{ee}{1} = patch(defoX,defoY,profile,'EdgeColor',meshcolor);
         h{ee}{2} = plot(defoX(:),defoY(:),'.','Color', meshcolor, 'Markersize',10);
     else
-        h{ee} = plot(Nodes(:,1)+factor*ux,Nodes(:,2)+factor*uy,'.-','Color', meshcolor, 'Markersize',10);
+%         h{ee} = plot(Nodes(:,1)+factor*ux,Nodes(:,2)+factor*uy,'.-','Color', meshcolor, 'Markersize',10);
+%         c = [];
+        Adj_m = zeros(size(Nodes,1)); %adjacent matrix
+        for ii = 1:size(Elements,1)
+            jj = Elements(ii,1);
+            kk = Elements(ii,2);
+            Adj_m(jj,kk) = 1;
+            Adj_m(kk,jj) = 1;
+        end
+        [x,y] = gplot(Adj_m,Nodes+[factor*ux,factor*uy]);
+        h{ee} = plot(x,y,'.-','Color', meshcolor, 'Markersize',10);
         c = [];
     end
     

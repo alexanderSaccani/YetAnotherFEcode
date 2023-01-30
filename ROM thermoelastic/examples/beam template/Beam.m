@@ -3,7 +3,7 @@
 % last modified: 1.12.2022
 
 % Straight temperature dependent beam template
-% single campled, axial loading
+% single campled, axial loading (only full model)
 
 clearvars ; close all; clc
 
