@@ -236,7 +236,7 @@ classdef BeamElement < Element
             q = T_e * x_e;
             eta = T_e * v_e;
             [K_local] = self.stiffness_derivative_local(q,eta);
-            K = Te.' * K_local * Te;
+            K = T_e.' * K_local * T_e;
         end
         
         function f2 = F2(self,x,y)
