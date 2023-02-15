@@ -53,6 +53,7 @@ BeamMesh.create_elements_table(Elements,myElementConstructor);
 
 %BeamMesh.set_essential_boundary_condition([1 BeamMesh.nNodes],[1 2 3],0) % Doubly clamped beam
 BeamMesh.set_essential_boundary_condition(1,[1 2 3],0) % clamped beam  (node,[constrained dofs],imposed disp.)
+BeamMesh.set_essential_boundary_condition(length(Nodes),1,0) 
 
 BeamAssembly = Assembly(BeamMesh);
 
@@ -72,7 +73,18 @@ k_beam = 3*E*I/l^3;
 node_spring = find_node(l,0,[],Nodes); % node where to put the force
 spring_dof = get_index(node_spring, nDofPerNode );
 
-n_dof_spring = spring_dof(2);
+n_dof_spring1 = spring_dof(2);
+
+
+node_spring = find_node(l/2,0,[],Nodes); % node where to put the force
+spring_dof = get_index(node_spring, nDofPerNode );
+
+n_dof_spring2 = spring_dof(2);
+
+
+n_dof_spring(1) = n_dof_spring1;
+n_dof_spring(2) = n_dof_spring2;
+
 
 % n_dof_spring = (size(Nodes,1)-1)*3+2;
 
@@ -86,16 +98,18 @@ M_C = BeamAssembly.constrain_matrix(M);
 
 %% Modal Analysis varying spring stiffness
 
-r_all = [0,2,5,10,20,40].';
+r1_all = [0,2,5,10,20,100].';
+r2_all = flip([0,2,5,10,20,100].');
 
 n_VMs = 2; % first n_VMs modes with lowest frequency calculated 
 
-VM = cell(length(r_all));
-omega = zeros(n_VMs,length(r_all));
+VM = cell(length(r1_all));
+omega = zeros(n_VMs,length(r1_all));
 
-for ii = 1:length(r_all)
+for ii = 1:length(r1_all)
     
-    k_spring = r_all(ii)*k_beam;
+    k_spring(1) = r1_all(ii)*k_beam;
+    k_spring(2) = r2_all(ii)*k_beam;
     [K,~] = Ktg_force(BeamAssembly,k_spring,n_dof_spring,zeros(3*size(Nodes,1),1)); % tangent stiffness matrix for u = 0
     
     K_C_ii = BeamAssembly.constrain_matrix(K); %tangent stiffness matrix for u = 0
@@ -125,7 +139,7 @@ for ii = 1:length(mode2plot)
     figure('units','normalized','position',[.3 .3 .4 .4]); hold on;
     title(['VM ',num2str(mode2plot(ii))]);
     
-    for jj = 1:length(r_all)
+    for jj = 1:length(r1_all)
         %decode output
         VM_iijj = decodeDofsNodes(VM{jj}(:,VM2pl),nNodes,nDofPerNode);
         PlotFieldonDeformedMesh(Nodes,Elements,[VM_iijj(:,1),VM_iijj(:,2)],'factor',scale_factor, 'color',color_list{jj});
@@ -141,7 +155,7 @@ disp(omega);
 %% define spring stiffness variation in time 
 
 %parametric variation of k(r)
-k_r = @(r) k_beam*r; 
+k_r = @(r) [k_beam*r(1),k_beam*r(2)]; 
 
 %temporal variation of r(t)
 eps = 0.01; 
@@ -154,17 +168,16 @@ T_k = 2*pi/om_k;
 % r_t = @(t) r_0 + A_max*sin(om_k*t);
 
 %ramp variation
-A_max = 50;
-r_t = @(t) A_max/T_k*4*t;
-
+A_max1 = 30;
+A_max2 = 30;
+r_t = @(t) [A_max1/(T_k*4)*t,A_max2-A_max2/(T_k*4)*t];
 
 k_t = @(t) k_r(r_t(t));
-
 
 %% define forcing
 
 %define external forcing
-om_fext = omega(1,1) + (omega(2,1) - omega(1,1))/10; % (omega(1,1) + omega(2,1))/2;
+om_fext = omega(1,1) + (omega(2,1) - omega(1,1))/2; % (omega(1,1) + omega(2,1))/2;
 T_fext = 2*pi/om_fext ; % period of ex. forcing
 F_ampl = 3; 
 
@@ -176,7 +189,7 @@ F = zeros(nDofsF,1);
 F(fext_dof(2)) = F_ampl;
 F_ext = @(t) F*sin(om_fext*t);
 
-%% nonlinear time integration
+%% Nonlinear time integration
 
 % Integrate nonlinear EOM__________________________________________________
 
@@ -191,7 +204,7 @@ qdd0 = zeros(nDofsC,1);
 
 % Precompute data for Assembly object
 BeamAssembly.DATA.M = M;
-[K_0,~] = Ktg_force(BeamAssembly,0,n_dof_spring,zeros(3*size(Nodes,1),1));
+[K_0,~] = Ktg_force(BeamAssembly,k_t(0),n_dof_spring,zeros(3*size(Nodes,1),1));
 BeamAssembly.DATA.K = K_0;
 BeamAssembly.DATA.C = C;
 
@@ -232,13 +245,13 @@ subplot 313
 plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,3,:)),'-');
 xlabel('t'); ylabel('w'); grid on; axis tight; 
 
-figure
-t = linspace(0,tint,1000);
-plot(t,k_t(t));
+% figure
+% t = linspace(0,tint,1000);
+% plot(t,k_t(t));
 
 
 %% reduced order model (constant basis)
-r_samples = 0;
+r_samples = [0,A_max2].';
 k_samples = r_samples*k_beam;
 nVMs_ROM = 2;
 logic_MD = 1;
@@ -286,7 +299,7 @@ dyn.nlin_red.time = TI_NL.Solution.time;
 %%
 % plot results of nonlinear dynamic analysis_______________________________
 
-plot_dof_location = 0.5;%0.9%0.75;%2/3; %percentage of length of beam
+plot_dof_location = 0.6;%0.9%0.75;%2/3; %percentage of length of beam
 node2plot = find_node(plot_dof_location*l,0,[],Nodes); % node where to put the force
 plot_dof = get_index(node2plot, BeamAssembly.Mesh.nDOFPerNode );
 
@@ -306,17 +319,23 @@ plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,3,:)),'-');
 plot(dyn.nlin_red.time,squeeze(dyn.nlin_red.disp(node2plot,3,:)),'-');
 xlabel('t'); ylabel('w'); grid on; axis tight; 
 
-figure
-t = linspace(0,tint,1000);
-plot(t,k_t(t));
+% figure
+% t = linspace(0,tint,1000);
+% plot(t,k_t(t));
 
 
 %% reduced order model (changing basis)
 
 %construct local ROMs
-r_samples = linspace(0,A_max,20);
-k_samples = r_samples*k_beam;
-nVMs_ROM = 3;
+nsamples = 5;
+k_samples = zeros(2,nsamples);
+for ii = 1:nsamples
+ dt = T_k/4*(nsamples-1);
+ t_ii = dt*(ii-1);
+ k_samples(:,ii) = k_t(t_ii);
+end
+
+nVMs_ROM = 2;
 logic_MD = 1;
 [ROMS,k_ROMs,k_validity_range] = construct_ROM(k_samples,BeamAssembly,nDofsF,n_dof_spring,nVMs_ROM,logic_MD);
 
@@ -396,6 +415,7 @@ while t0_ii < tmax
 
 %choose which rom to use
 p0_ii = k_t(t0_ii);
+p0_ii = p0_ii(1);
 pchange = [pchange,p0_ii];
 tchange = [tchange,t0_ii];
 
@@ -551,8 +571,15 @@ xlabel('t'); ylabel('w'); grid on; axis tight;
 function [K,F] = Ktg_force(beamAssembly,k_spring,n_dof_spring, u)
 
 [K, F] = beamAssembly.tangent_stiffness_and_force(u);
-K(n_dof_spring,n_dof_spring) = +k_spring + K(n_dof_spring,n_dof_spring);
-F(n_dof_spring) = +k_spring*u(n_dof_spring) + F(n_dof_spring);
+
+n_springs = length(n_dof_spring);
+
+for ii = 1:n_springs
+    
+    K(n_dof_spring(ii),n_dof_spring(ii)) = +k_spring(ii) + K(n_dof_spring(ii),n_dof_spring(ii));
+    F(n_dof_spring(ii)) = +k_spring(ii)*u(n_dof_spring(ii)) + F(n_dof_spring(ii));
+
+end
 
 end
 
@@ -589,7 +616,7 @@ end
 
 function [ROMS,k_ROMs,validity_range] = construct_ROM(k_samples,Assembly,nDofsF,n_dof_spring,nVMs,logic_MD)
 
-nROMs = length(k_samples);
+nROMs = size(k_samples,2);
 ROMS = cell(nROMs,1);
 
 M = Assembly.mass_matrix();
@@ -599,7 +626,7 @@ u_eq = zeros(nDofsF,1);
 
 for ii = 1:nROMs
    
-    [K,~] = Ktg_force(Assembly,k_samples(ii),n_dof_spring, u_eq);
+    [K,~] = Ktg_force(Assembly,k_samples(:,ii),n_dof_spring, u_eq);
     
     K_C = Assembly.constrain_matrix(K); %tangent stiffness matrix for u = 0
     
@@ -633,7 +660,7 @@ for ii = 1:nROMs
 end 
     
 
-k_ROMs = k_samples; 
+k_ROMs = k_samples(1,:); 
 
 
 aa = [k_ROMs(1),k_ROMs,k_ROMs(end)];
@@ -694,8 +721,9 @@ end
 
 
 function logic = exit_integration(q,qd,t,k_t,kmin,kmax)
-
-if k_t(t) < kmin || k_t(t) > kmax
+kt = k_t(t);
+kt
+if kt(1) < kmin || kt(1) > kmax
    logic = 1;
 else
    logic = 0;

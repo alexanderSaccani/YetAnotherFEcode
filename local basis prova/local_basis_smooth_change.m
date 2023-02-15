@@ -164,7 +164,7 @@ k_t = @(t) k_r(r_t(t));
 %% define forcing
 
 %define external forcing
-om_fext = omega(1,1) + (omega(2,1) - omega(1,1))/2; % (omega(1,1) + omega(2,1))/2;
+om_fext = omega(1,1) + (omega(2,1) - omega(1,1))/10; % (omega(1,1) + omega(2,1))/2;
 T_fext = 2*pi/om_fext ; % period of ex. forcing
 F_ampl = 2; 
 
@@ -314,11 +314,11 @@ plot(t,k_t(t));
 %% reduced order model (changing basis)
 
 %construct local ROMs
-r_samples = linspace(0,A_max,20);
+r_samples = linspace(0,A_max,3);
 k_samples = r_samples*k_beam;
 nVMs_ROM = 2;
 logic_MD = 1;
-[ROMS,k_ROMs,k_validity_range] = construct_ROM(k_samples,BeamAssembly,nDofsF,n_dof_spring,nVMs_ROM,logic_MD);
+[ROMS,k_ROMs,k_validity_range, omega_ROMs] = construct_ROM(k_samples,BeamAssembly,nDofsF,n_dof_spring,nVMs_ROM,logic_MD);
 
 % Initial condition: equilibrium
 u_f_F = zeros(nDofsC,1);
@@ -375,6 +375,9 @@ a_f_F = zeros(nDofsC,1);
 % dyn.nlin_red_c.time = time_red;
 
 %%
+
+smooth_trans = 1;
+
 % Initial condition: equilibrium
 u1_F = zeros(nDofsC,1);
 v1_F = zeros(nDofsC,1);
@@ -387,63 +390,141 @@ time_red = [];
 u_full_red = [];
 ud_full_red = [];
 
-t0_ii = tmin;
+t0 = tmin;
 
 pchange = [];
 tchange = [];
 
-while t0_ii < tmax
+V_old = ROMS{1}.V; %the initial basis used in the transition does not matter (since intial old displ are zero)
+q_old_f = zeros(size(V_old,2),1); %initial displacement used in transition phase is zero
+qd_old_f = q_old_f;
 
-%choose which rom to use
-p0_ii = k_t(t0_ii);
-pchange = [pchange,p0_ii];
-tchange = [tchange,t0_ii];
+while t0 < tmax
 
+%qf_old
+%V_old
+    
+%evaluate the parameter value at time t0
+p0 = k_t(t0);
+
+%save time when you change parameters, and initial value of parameter
+pchange = [pchange,p0];
+tchange = [tchange,t0];
+
+%find the new basis representing the dynamic for given parameter value
 for jj = 1:size(k_validity_range,2)
     
-    if (p0_ii <= k_validity_range(2,jj)) && (p0_ii >= k_validity_range(1,jj))
+    if (p0 <= k_validity_range(2,jj)) && (p0 >= k_validity_range(1,jj))
         
-        kmin_ii = k_validity_range(1,jj);
-        kmax_ii = k_validity_range(2,jj);
+        kmin = k_validity_range(1,jj);
+        kmax = k_validity_range(2,jj);
         break
         
     end
     
 end
-  
-% q0_ii = ROMS{jj}.V'*u1_F;   
-% qd0_ii = ROMS{jj}.V'*v1_F; 
-% qdd0_ii = ROMS{jj}.V'*a1_F; 
 
-pseudo_inv = pinv(ROMS{jj}.V);
-q0_ii = pseudo_inv*u1_F;   
-qd0_ii = pseudo_inv*v1_F; 
-qdd0_ii = pseudo_inv*a1_F; 
+V_current = ROMS{jj}.V;
+omega_current_ROM = omega_ROMs(:,jj);
+
+%smooth transition between
+if smooth_trans == 1
+
+    q0_new = zeros(size(V_current,2),1);
+    qd0_new = q0_new;
+    qdd0_new = q0_new;
+    
+    vel_factor = 100;
+    lam1 = vel_factor/(2*pi/max(omega_current_ROM));
+    lam2 = 10*lam1;
+    
+    lam = [lam1,lam2];
+    
+    dt_trans = 1/lam1
+    
+    t_exit_int = t0 + dt_trans;
+    
+    % Instantiate object for nonlinear time integration
+    TI_NL = ImplicitNewmark_mod('timestep',h,'alpha',0.005);
+
+    % nonlinear red Residual evaluation function handle;                  
+    residual = @(q,qd,qdd,t) residual_beam_spring_ROM_trans(q,qd,qdd,t,...
+        BeamAssembly,F_ext,k_t,n_dof_spring,V_current,V_old,lam,q_old_f,qd_old_f);
+
+    % integrate equations with Newmark scheme
+    TI_NL.Integrate(q0,qd0,qdd0,t0,t_exit_int,residual);
+
+    % store solution in more suitable array (only displacements)
+    u_red = TI_NL.Solution.q;
+    ud_red = TI_NL.Solution.qd;
+
+    u_full_ii = get_full_solution(0*u_red,V_current); %non si fa cosi'!
+    ud_full_ii = get_full_solution(0*ud_red,V_current);
+    
+    
+    %save full disp and time vector
+    u_full_ii = BeamAssembly.unconstrain_vector(u_full_ii); 
+    u_full_red = [u_full_red,u_full_ii];
+
+    ud_full_ii = BeamAssembly.unconstrain_vector(ud_full_ii); 
+    ud_full_red = [ud_full_red,ud_full_ii];
+
+    time_red = [time_red,TI_NL.Solution.time];
+
+    t0 = time_red(end);
+        
+    q0 = u_red(:,end);
+    qd0 = ud_red(:,end);
+    qdd0 = 0*q0; %attenzione!!!!
+    
+else
+
+    % q0_ii = ROMS{jj}.V'*u1_F;   
+    % qd0_ii = ROMS{jj}.V'*v1_F; 
+    % qdd0_ii = ROMS{jj}.V'*a1_F; 
+
+    pseudo_inv = pinv(V_current);
+    q0 = pseudo_inv*u1_F;   
+    qd0 = pseudo_inv*v1_F; 
+    qdd0 = pseudo_inv*a1_F; 
+
+
+end
 
 %condition to terminate integration
-term_cond = @(q,qd,t) exit_integration(q,qd,t,k_t,kmin_ii,kmax_ii);
+term_cond = @(q,qd,t) exit_integration(q,qd,t,k_t,kmin,kmax);
 
 % Instantiate object for nonlinear time integration
 TI_NL = ImplicitNewmark_mod('timestep',h,'alpha',0.005);
 
 % nonlinear red Residual evaluation function handle;                  
-residual = @(q,qd,qdd,t) residual_beam_spring_ROM(q,qd,qdd,t,BeamAssembly,F_ext,k_t,n_dof_spring,ROMS{jj}.V);
+residual = @(q,qd,qdd,t) residual_beam_spring_ROM(q,qd,qdd,t,BeamAssembly,F_ext,k_t,n_dof_spring,V_current);
 
 % integrate equations with Newmark scheme
-TI_NL.Integrate(q0_ii,qd0_ii,qdd0_ii,t0_ii,tmax,residual,term_cond);
+TI_NL.Integrate(q0,qd0,qdd0,t0,tmax,residual,term_cond);
 
 % store solution in more suitable array (only displacements)
 u_red = TI_NL.Solution.q;
 ud_red = TI_NL.Solution.qd;
 
-u_full_ii = get_full_solution(u_red,ROMS{jj}.V);
-ud_full_ii = get_full_solution(ud_red,ROMS{jj}.V);
+u_full_ii = get_full_solution(u_red,V_current);
+ud_full_ii = get_full_solution(ud_red,V_current);
 
-%save final displacements and velocities
-u1_F = u_full_ii(:,end);
-v1_F = ROMS{jj}.V*(TI_NL.Solution.qd(:,end));
-a1_F = ROMS{jj}.V*TI_NL.Solution.qdd_end;
-%accelerations ?? 
+if smooth_trans == 1
+    
+    V_old = V_current;
+    q_old_f = u_red(:,end);
+    qd_old_f = ud_red(:,end);
+    
+else
+    
+    %save final displacements and velocities
+    u1_F = u_full_ii(:,end);
+    v1_F = V_current*(TI_NL.Solution.qd(:,end));
+    a1_F = V_current*TI_NL.Solution.qdd_end;
+    
+end
+    
 
 %save full disp and time vector
 u_full_ii = BeamAssembly.unconstrain_vector(u_full_ii); 
@@ -454,8 +535,7 @@ ud_full_red = [ud_full_red,ud_full_ii];
 
 time_red = [time_red,TI_NL.Solution.time];
 
-
-t0_ii = time_red(end);
+t0 = time_red(end);
 
 
 end
@@ -468,7 +548,7 @@ dyn.nlin_red_c.time = time_red;
 %% plot figure
 
 %displacements
-plot_dof_location = 0.5;%0.9%0.75;%2/3; %percentage of length of beam
+plot_dof_location = 0.9;%0.9%0.75;%2/3; %percentage of length of beam
 node2plot = find_node(plot_dof_location*l,0,[],Nodes); % node where to put the force
 plot_dof = get_index(node2plot, BeamAssembly.Mesh.nDOFPerNode );
 
@@ -587,10 +667,11 @@ end
 
 
 
-function [ROMS,k_ROMs,validity_range] = construct_ROM(k_samples,Assembly,nDofsF,n_dof_spring,nVMs,logic_MD)
+function [ROMS,k_ROMs,validity_range,omega_roms] = construct_ROM(k_samples,Assembly,nDofsF,n_dof_spring,nVMs,logic_MD)
 
 nROMs = length(k_samples);
 ROMS = cell(nROMs,1);
+omega_roms = zeros(nVMs,nROMs);
 
 M = Assembly.mass_matrix();
 M_C = Assembly.constrain_matrix(M);
@@ -609,6 +690,8 @@ for ii = 1:nROMs
     for jj = 1:nVMs
         VM(:,jj) = VM(:,jj)/vecnorm(VM(:,jj));
     end
+    
+    omega_roms(:,ii) = sqrt(diag(omega2)).';
     
     
     %compute here the modal derivatives
@@ -655,7 +738,6 @@ k_spring_t = k_spring(t);
 M = beamAssembly.DATA.M;
 C = beamAssembly.DATA.C;
 
-
 u = beamAssembly.unconstrain_vector(V*q);
 [K, F] = Ktg_force(beamAssembly,k_spring_t,n_dof_spring, u); 
 
@@ -677,6 +759,61 @@ drdq = K_red;
 c0 = norm(F_inertial) + norm(F_damping) + norm(F_elastic) + norm(F_external);
 
 end
+
+function [ r, drdqdd,drdqd,drdq, c0] = residual_beam_spring_ROM_trans( q, qd, qdd, t,...
+    beamAssembly, Fext, k_spring ,n_dof_spring,V_curr,V_old,lam,q_old_f,qd_old_f)
+
+
+%forcing to 0 of old reduced coordinates
+lam1 = lam(1);
+lam2 = lam(2);
+
+c2 = (qd_old_f + lam1*q_old_f)/(lam1 - lam2);
+c1 = q_old_f - c2;
+
+q_old = c1*exp(-lam1*t) + c2*exp(-lam2*t);
+qd_old = -lam1*c1*exp(-lam1*t) - lam2*c2*exp(-lam2*t);
+qdd_old = +lam1^2*c1*exp(-lam1*t) + lam2^2*c2*exp(-lam2*t); %attenzione! l'accelerazione iniziale non e' la stessa... 
+
+%basis
+W = [V_curr,V_old];
+
+%reduced coordinates
+eta = [q',q_old']'; %extended reduced coordinate vector
+etad = [qd',qd_old']';
+etadd = [qdd',qdd_old']';
+
+
+%compute the residual
+k_spring_t = k_spring(t);
+
+M = beamAssembly.DATA.M;
+C = beamAssembly.DATA.C;
+
+u = beamAssembly.unconstrain_vector(W*eta);
+
+[K, F] = Ktg_force(beamAssembly,k_spring_t,n_dof_spring, u); 
+
+C_full = beamAssembly.constrain_matrix(C);
+K_full = beamAssembly.constrain_matrix(K);
+M_full = beamAssembly.constrain_matrix(M);
+
+F_inertial = V_curr' *M_full *W *etadd;
+F_damping = V_curr' *C_full *W *etad;
+F_elastic = V_curr'*beamAssembly.constrain_vector(F);
+F_external =  V_curr'*beamAssembly.constrain_vector(Fext(t)); 
+
+r = F_inertial + F_damping + F_elastic - F_external ;
+
+drdqdd = V_curr'*M_full*V_curr;
+drdqd = V_curr'*C_full*V_curr;
+drdq = V_curr'*K_full*V_curr;
+
+
+c0 = norm(F_inertial) + norm(F_damping) + norm(F_elastic) + norm(F_external);
+
+end
+
 
 function x_full = get_full_solution(disp_red,V)
 
@@ -702,3 +839,4 @@ else
 end
 
 end
+

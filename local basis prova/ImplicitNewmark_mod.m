@@ -49,7 +49,7 @@ classdef ImplicitNewmark_mod < handle
             TI.hmin = p.Results.hmin;
             TI.linear = p.Results.linear;
         end
-        function Integrate(obj,x0,xd0,xdd0,tmin, tmax, Residual, termination_cond)            
+        function Integrate(obj,x0,xd0,xdd0,tmin, tmax, Residual, varargin)            
             % Integrates with Initial condition x0,xd0 from [0 tmax]
             % Residual is a function handle that has the following syntax
             % 
@@ -57,6 +57,11 @@ classdef ImplicitNewmark_mod < handle
             %termination_cond is a function f(x0,xd0,t) that returns a
             %logic value (0 or 1). When the logic is 1, integration is
             %stopped
+            if nargin < 8
+                termination_cond = @(q_old,qd_old,t) 0;
+            else
+                termination_cond = varargin{1};
+            end
             
             if obj.h ==0
                 error('Please specify a positive time step')
@@ -72,7 +77,9 @@ classdef ImplicitNewmark_mod < handle
             qdd_old = xdd0;
             NR = 0;
             R = 0;
-            i = 1;            
+            i = 1;        
+            
+
             
             while t < tmax && (termination_cond(q_old,qd_old,t) == 0)
                 t = t+obj.h;
