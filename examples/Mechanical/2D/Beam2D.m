@@ -5,7 +5,7 @@ clc
 
 whichModel = 'CUSTOM'; % or "ABAQUS"
 elementType = 'QUAD4';
-% elementType = 'QUAD8';
+%elementType = 'QUAD8';
 
 %% PREPARE MODEL                                                    
 
@@ -115,7 +115,8 @@ title(['\Phi_' num2str(mod) ' - Frequency = ' num2str(f0(mod),3) ' Hz'])
 F = zeros(myMesh.nDOFs,1);
 nf = find_node(Lx/2,Ly/2,[],nodes); % node where to put the force
 node_force_dofs = get_index(nf, myMesh.nDOFPerNode );
-F(node_force_dofs(2)) = 10e5;
+F(node_force_dofs(2)) = -10e4;
+
 
 u_lin = BeamAssembly.solve_system(K, F);
 ULIN = reshape(u_lin,2,[]).';	% Linear response
@@ -129,7 +130,7 @@ fprintf(['\n <strong>Max displacements</strong>:\n  Linear:\t\t%.3i \n' ...
 figure('units','normalized','position',[.2 .1 .6 .8])
 scale = 2*Ly/max(abs(UNL(:)));
 PlotMesh(nodes, elementPlot, 0);
-PlotFieldonDeformedMesh(nodes,elementPlot,UNL,'factor',scale,'color','k');
+PlotFieldonDeformedMesh(nodes,elementPlot,ULIN,'factor',scale,'color','k');
 colormap jet
 title(['NONLINEAR STATIC RESPONSE (scale factor: ' num2str(scale) 'x)'])
 

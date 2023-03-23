@@ -90,6 +90,7 @@ n_VMs = 2; % first n_VMs modes with lowest frequency calculated
 
 [VM,omega2] = eigs(K_cold_C,M_C,n_VMs,'SM'); 
 omega = sqrt(diag(omega2));
+[f0,ind] = sort(sqrt(diag(omega2))/2/pi);
 %normalize with respect to max. amplitude
 for ii = 1:n_VMs
     VM(:,ii) = VM(:,ii)/max(sqrt(sum(VM(:,ii).^2,2)));

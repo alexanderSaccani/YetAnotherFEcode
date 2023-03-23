@@ -1,4 +1,4 @@
-function [ u_lin, u ] = static_equilibrium( Assembly, Fext, varargin )
+function [ u_lin, u ] = static_eq( Assembly, Fext, varargin )
 % finds the equilibrium configuration of the model subject to Fext load and T.
 
 [nsteps,tol,method,displayoption,vararginTanStiffForce] = parse_inputs(varargin{:});

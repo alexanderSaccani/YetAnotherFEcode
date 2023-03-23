@@ -5,13 +5,13 @@ clc
 
 % ***** Elements with linear shape functions (very slow mesh convergence, 
 %     good for fast code-testing)
-% elementType = 'HEX8';
+%elementType = 'HEX8';
 % elementType = 'TET4';
 
 % ***** Elements with quadratic shape functions
 % elementType = 'TET10';
-elementType = 'WED15';
-% elementType = 'HEX20';
+%elementType = 'WED15';
+elementType = 'HEX20';
 
 %% PREPARE MODEL                                                    
 
@@ -41,9 +41,9 @@ end
 
 % MESH_____________________________________________________________________
 l = 3;
-w = .3;
-t = .05;
-nx = 15;
+w = .2;
+t = .1;
+nx = 20;
 ny = 3;
 nz = 2;
 [nodes, elements, nset]=mesh_3Dparallelepiped(elementType,l,w,t,nx,ny,nz);
@@ -57,6 +57,7 @@ myMesh.create_elements_table(elements,myElementConstructor);
 % MESH > BOUNDARY CONDITONS
 myMesh.set_essential_boundary_condition([nset{1} nset{4}],1:3,0)
 % myMesh.BC.set_dirichlet_dofs([nset{2} nset{3}],1:3,0) % abaqus
+myMesh.set_essential_boundary_condition([nset{1} nset{4}],1:3,0)
 
 % ASSEMBLY ________________________________________________________________
 BeamAssembly = Assembly(myMesh);
@@ -91,7 +92,7 @@ PlotMesh(nodes,elements,0);
 v1 = reshape(V0(:,mod),3,[]).';
 PlotFieldonDeformedMesh(nodes,elements,v1,'factor',1);
 title(['\Phi_' num2str(mod) ' - Frequency = ' num2str(f0(mod),3) ' Hz'])
-drawnow
+%drawnow
 
 
 %% EXAMPLE 2: static test                                           
@@ -105,23 +106,23 @@ drawnow
 F = zeros(myMesh.nDOFs,1);
 nf = find_node(l/2,w/2,t/2,nodes); % node where to put the force
 node_force_dofs = get_index(nf, myMesh.nDOFPerNode );
-F(node_force_dofs(3)) = 1e3;
+F(node_force_dofs(3)) = 10e5;
 
-% u_lin = BeamAssembly.solve_system(K, F);
-% ULIN = reshape(u_lin,3,[]).';	% Linear response
-% u = static_equilibrium(BeamAssembly, F, 'display', 'iter-detailed');
-% UNL = reshape(u,3,[]).';        % Nonlinear response
-% 
-% fprintf(['\n <strong>Max displacements</strong>:\n  Linear:\t\t%.3i \n' ...
-%     '  Nonlinear:\t%.3i \n\n'],max(u_lin(:)),max(u(:)))
-% 
-% % PLOT
-% figure('units','normalized','position',[.2 .1 .6 .8])
-% scale = 10;
-% PlotMesh(nodes,elements,0);
-% PlotFieldonDeformedMesh(nodes,elements,UNL,'factor',scale,'color','w');
-% colormap jet
-% title(['NONLINEAR STATIC RESPONSE (scale factor: ' num2str(scale) 'x)'])
+u_lin = BeamAssembly.solve_system(K, F);
+ULIN = reshape(u_lin,3,[]).';	% Linear response
+[~,u] = static_equilibrium(BeamAssembly, F, 'display', 'iter-detailed');
+UNL = reshape(u,3,[]).';        % Nonlinear response
+
+fprintf(['\n <strong>Max displacements</strong>:\n  Linear:\t\t%.3i \n' ...
+    '  Nonlinear:\t%.3i \n\n'],max(u_lin(:)),max(u(:)))
+
+% PLOT
+figure('units','normalized','position',[.2 .1 .6 .8])
+scale = 10;
+PlotMesh(nodes,elements,0);
+PlotFieldonDeformedMesh(nodes,elements,UNL,'factor',scale,'color','w');
+colormap jet
+title(['NONLINEAR STATIC RESPONSE (scale factor: ' num2str(scale) 'x)'])
 
 
 %% EXAMPLE 3: compute modal derivatives                             

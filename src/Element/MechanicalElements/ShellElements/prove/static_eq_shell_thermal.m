@@ -1,19 +1,24 @@
-function [ u_lin, u ] = static_equilibrium( Assembly, Fext, varargin )
+function [ u_lin, u ] = static_eq_shell_thermal( Assembly, Fext, T, gradT, varargin )
 % finds the equilibrium configuration of the model subject to Fext load and T.
 
-[nsteps,tol,method,displayoption,vararginTanStiffForce] = parse_inputs(varargin{:});
+[nsteps,tol,method,displayoption,initialGuess] = parse_inputs(varargin{:});
 
 K = Assembly.DATA.K;
-F0 = Assembly.DATA.F0;
+u_lin = Assembly.solve_system(K,Fext);
 
-u_lin = Assembly.solve_system(K,Fext,F0); % in the linearized model, the internal forces are Kx + F0
-u0 = Assembly.constrain_vector(u_lin);
+if isempty(initialGuess)
+    u_guess = u_lin;
+    u0 = Assembly.constrain_vector(u_lin);
+else
+    u_guess = initialGuess;  %unconstrained vector (called lin, but not necesserely it is the linear solution)
+    u0 = Assembly.constrain_vector(u_guess); %constrained vector
+end
 
 switch method
     case 'fsolve'
         options = optimoptions('fsolve','SpecifyObjectiveGradient',true,...
             'MaxIterations',10000,'Display',displayoption);
-        [ueq] = fsolve(@(u)f(u,Assembly,Fext,vararginTanStiffForce),u0,options);
+        [ueq] = fsolve(@(u)f(u,Assembly,Fext,T,gradT),u0,options);
         u = Assembly.unconstrain_vector(ueq);
         
     case 'newton'
@@ -26,11 +31,7 @@ switch method
             c0 = norm(Assembly.constrain_vector(Fext_j));
             it = 0;
             while true
-                if isempty(vararginTanStiffForce)
-                    [K, Fint] = Assembly.tangent_stiffness_and_force(x);
-                else
-                    [K, Fint] = Assembly.tangent_stiffness_and_force(x,vararginTanStiffForce{:});
-                end
+                [K, Fint] = Assembly.tangent_stiffness_and_force(u,T,gradT);
                 residual = Fext_j - Fint;
                 c = norm(Assembly.constrain_vector(residual))/c0;
                 fprintf('STEP %d, ITERATION %d, RESIDUAL %d \n',j,it,c);
@@ -48,25 +49,21 @@ end
 
 end
 
-function [F,K] = f(u,Assembly,Fext,vararginTanStiffForce)
+function [F,K] = f(u,Assembly,Fext,T,gradT)
 x = Assembly.unconstrain_vector(u);
-    if isempty(vararginTanStiffForce)
-        [Kt, Fint] = Assembly.tangent_stiffness_and_force(x);
-    else
-        [Kt, Fint] = Assembly.tangent_stiffness_and_force(x,vararginTanStiffForce{:});
-    end
+[Kt, Fint] = Assembly.tangent_stiffness_and_force(x,T,gradT);
 K = Assembly.constrain_matrix(Kt);
 F = Assembly.constrain_vector(Fint - Fext);
 end
 
 
-function [nsteps,tol,method,displayoption,vararginTanStiffForce] = parse_inputs(varargin)
+function [nsteps,tol,method,displayoption,initialGuess] = parse_inputs(varargin)
 %% parsing inputs
 defaultnsteps = 100;
 defaulttol = 1e-6;
 defaultmethod = 'fsolve';
 defaultdisplay = 'final';
-defaultVararginTanStiffForce = [];
+defaultInitialGuess = [];
 
 p = inputParser;
 addParameter(p,'nsteps',defaultnsteps, @(x)validateattributes(x, ...
@@ -74,16 +71,16 @@ addParameter(p,'nsteps',defaultnsteps, @(x)validateattributes(x, ...
 addParameter(p,'tol',defaulttol, @(x)validateattributes(x, ...
     {'numeric'},{'nonempty','positive'}) );
 addParameter(p,'method',defaultmethod,@(x)validateattributes(x, ...
-    {'char'},{'nonempty'}));
+    {'char'},{'nonempty'}))
 addParameter(p,'display',defaultdisplay,@(x)validateattributes(x, ...
-    {'char'},{'nonempty'}));
-addParameter(p,'vararginTanStiffForce', defaultVararginTanStiffForce);
+    {'char'},{'nonempty'}))
+addParameter(p,'initialGuess', defaultInitialGuess, @(x)validateattributes(x, ...
+    {'numeric'},{'nonempty'}) );
 parse(p,varargin{:});
 
 nsteps = p.Results.nsteps;
 tol = p.Results.tol;
 method = p.Results.method;
 displayoption = p.Results.display;
-vararginTanStiffForce = p.Results.vararginTanStiffForce;
-
+initialGuess = p.Results.initialGuess;
 end

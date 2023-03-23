@@ -12,7 +12,10 @@ clearvars ; close all; clc
 %GEOMETRY__________________________________________________________________
 l = 0.1; 
 h = 1e-3;
-b = 1e-2; 
+b = 1e-2;
+
+height_midspan = 2e-3;
+w = height_midspan/l; % this parameter varies from 0 to 0.5 (straight beam to half circumference)
 
 %MATERIAL__________________________________________________________________
 E       = 70e9;  % 70e9 % 200e9 % Young's modulus
@@ -29,17 +32,23 @@ set(myThermalBeamMaterial,'YOUNGS_MODULUS', E,'DENSITY',rho,...
 nElements = 60;
 
 %define nodes
-dx = l/nElements; %x spacing between nodes
+R = (l/4 + l*w^2)/(2*w);
+yy = R - l*w;
+xx = l/2;
+th0 = atan(yy/xx);
 
-nodes_x = (0:dx:l).'; %x coordinates for nodes
-nodes_y = zeros(length(nodes_x),1); %y coordinates for nodes
+th = linspace(th0,pi-th0,nElements+1);
+
+nodes_x = (R*cos(th) + l/2)'; %x coordinates for nodes
+nodes_y = (R*sin(th) - (R-l*w))'; %y coordinates for nodes
 
 nNodes = length(nodes_x); %number of nodes
 nDofPerNode = 3;
 
+
 %create mesh from nodes
 Nodes = [nodes_x, nodes_y];
-BeamMesh = Mesh(Nodes); 
+arcMesh = Mesh(Nodes); 
 
 %define elements 
 Elements = [1:nNodes-1;2:nNodes].'; % ROW -> # element, 
@@ -47,14 +56,14 @@ Elements = [1:nNodes-1;2:nNodes].'; % ROW -> # element,
 myElementConstructor = @()ThermalBeamElement(b, h, myThermalBeamMaterial); %type of element
 
 %create element table from elements
-BeamMesh.create_elements_table(Elements,myElementConstructor);
+arcMesh.create_elements_table(Elements,myElementConstructor);
 
 
 %BOUNDARY CONDITIONS_______________________________________________________
-BeamMesh.set_essential_boundary_condition([1 BeamMesh.nNodes],[1 2 3],0) % Doubly clamped beam
+arcMesh.set_essential_boundary_condition([1 arcMesh.nNodes],[1 2 3],0) % Doubly clamped beam
 %BeamMesh.set_essential_boundary_condition(1,[1 2 3],0) % clamped beam  (node,[constrained dofs],imposed disp.)
 
-BeamAssembly = Assembly(BeamMesh);
+BeamAssembly = Assembly(arcMesh);
 
 nDofsF = BeamAssembly.Mesh.EBC.nDOFs; % #dofs free (without bc)
 nDofsC = nDofsF - size(BeamAssembly.Mesh.EBC.constrainedDOFs,1); % #dofs constrained (with bc)
@@ -83,31 +92,31 @@ VM = BeamAssembly.unconstrain_vector(VM); %vibration modes
 %decode output
 VM = decodeDofsNodes(VM,nNodes,nDofPerNode);
 
-% %plot VMs
-% mode2plot = [1,2];
-% for ii = 1:length(mode2plot)
-%   
-%     VM_ii = squeeze(VM(:,:,mode2plot(ii)));
-%     
-%     u_ii = VM_ii(:,1); % long. displ.
-%     v_ii = VM_ii(:,2); % transv. displ
-%     r_ii = VM_ii(:,3); % rotation
-%     
-%     figure
-%     subplot 411
-%     plot(nodes_x,nodes_y,'.-','markersize',10); hold on;
-%     plot(nodes_x + u_ii, nodes_y + v_ii,'.-','markersize',10)
-%     title(['VM ',num2str(mode2plot(ii)),', Frequency = '...
-%     num2str(omega(mode2plot(ii))/(2*pi)) ' Hz'])
-%     
-%     subplot 412
-%     plot(nodes_x,v_ii,'-'); title('tranverse disp.'); xlabel('x')
-%     subplot 413
-%     plot(nodes_x,u_ii,'-'); title('longitudinal disp.'); xlabel('x')
-%     subplot 414
-%     plot(nodes_x,r_ii,'-'); title('rotation'); xlabel('x')
-%     
-% end
+%plot VMs
+mode2plot = [1,2];
+for ii = 1:length(mode2plot)
+  
+    VM_ii = squeeze(VM(:,:,mode2plot(ii)));
+    
+    u_ii = VM_ii(:,1); % long. displ.
+    v_ii = VM_ii(:,2); % transv. displ
+    r_ii = VM_ii(:,3); % rotation
+    
+    figure
+    subplot 411
+    plot(nodes_x,nodes_y,'.-','markersize',10); hold on;
+    plot(nodes_x + u_ii, nodes_y + v_ii,'.-','markersize',10)
+    title(['VM ',num2str(mode2plot(ii)),', Frequency = '...
+    num2str(omega(mode2plot(ii))/(2*pi)) ' Hz'])
+    
+    subplot 412
+    plot(nodes_x,v_ii,'-'); title('tranverse disp.'); xlabel('x')
+    subplot 413
+    plot(nodes_x,u_ii,'-'); title('longitudinal disp.'); xlabel('x')
+    subplot 414
+    plot(nodes_x,r_ii,'-'); title('rotation'); xlabel('x')
+    
+end
 
 
 %% Define loads 
@@ -171,7 +180,81 @@ plot(nodes_x + scl*static.nlin(:,1), nodes_y + scl*static.nlin(:,2), '.-', 'mark
 plot(nodes_x + scl*static.lin(:,1), nodes_y + scl*static.lin(:,2), '--', 'color','cyan','linewidth',2)
 title('static deformation shape'); xlabel('x [m]'); legend('undeformed','nonlinear','linear','linewidth',2)
 
+%% static Buckling analysis
+F0 = F; %load configuration corresponding to lambda = 1 (load multiplier)
 
+lam_high = 12; %load multiplier max abs value (symmetric analysis for positive and negative values of lambda from the origin
+
+%T samples 
+T_samples = [0,50,100,160];
+
+%parameters for continuation
+Sopt.parametrization = 'arc_length';
+Sopt.predictor = 'secant';
+Sopt.reversaltolerance = 1;
+ds = {0.03,0.04,0.03,0.01};
+
+%initialize output
+X_buckl_an = cell(length(T_samples),1);
+
+for ii = 1:length(T_samples)
+    
+    T_ampl_ii = T_samples(ii);
+    
+    p = l/4; %width of thermal pulse
+    xc_st = l/2; %center of thermal pulse
+    x0_st = xc_st - p/2; %left extreme of pulse
+    
+    T = T_ampl_ii*(sin(pi*(nodes_x-x0_st)/p)).^2.*(heaviside(nodes_x-x0_st) - ...
+        heaviside((nodes_x-x0_st)-p)); %static temp profile
+
+
+    [K_hot,gth] = BeamAssembly.tangent_stiffness_and_force(zeros(nDofsF,1),T);
+    u_lin_0 = BeamAssembly.solve_system(K_hot, 0-gth);   %subtract the internal force generated  by the temperature
+
+    u_guess = BeamAssembly.constrain_vector(u_lin_0);
+
+    % ds = norm(u_lin_0);
+    
+    ds_ii = ds{ii};
+    
+    fun_residual = @(X) residual_buckling(X,BeamAssembly,F0,T);
+    [X1,Solinfo,Sol] = solve_and_continue(u_guess,fun_residual,0,lam_high,ds_ii,Sopt);
+    [X2,Solinfo,Sol] = solve_and_continue(u_guess,fun_residual,0,-lam_high,ds_ii,Sopt);
+    
+    X_buckl_an{ii} = [flip(X2,2),X1];
+
+       
+end
+
+% plot results of buckling analysis
+plot_dof_location = 0.5; %percentage of length of beam
+node2plot = find_node(plot_dof_location*l,0,[],Nodes); % node to plot
+dof2plot = get_index(node2plot, nDofPerNode);
+dof2plot = dof2plot(2); %plot vertical displacement
+
+color_list = {'#0072BD','#D95319','#EDB120','#7E2F8E','#77AC30','#4DBEEE',...
+    '#F00','#F80','#FF0','#0B0','#00F','#50F','#A0F'};
+
+figure('units','normalized','position',[.3 .3 .4 .4]);
+title(['buckling analysis: tranversal displacement at ', num2str(plot_dof_location*100),'% of beam span']);
+leg = cell(length(T_samples),1); %legend initialize
+for ii = 1:length(T_samples)
+    
+    hold on;
+    X_ii = X_buckl_an{ii};
+    delta = X_ii(dof2plot,:);
+    lam = X_ii(end,:);
+    plot(delta,lam,'color',color_list{ii},'linewidth',2);
+    
+    xlabel('displacement [m]')
+    ylabel('\lambda')
+    
+    leg{ii} = ['T = ',num2str(T_samples(ii))];
+    
+end
+legend(leg);
+grid on;
 %% Dynamic response using Implicit Newmark
 %force and thermal load____________________________________________________
 %define external forcing
@@ -201,7 +284,7 @@ F_ext = @(t) F*sin(om_fext*t);
 % T_dyn_t = @(t) T_dyn_p(xc_dyn(t)); %evaluate the temperature profile in time
 
 % 2)thermal pulse at the center ramping up
-T_ampl = 120;
+T_ampl = 160;
 p = l/2; %width of thermal pulse
 xc = l/2; %center location at initial time
 eps = 0.05; %om_fex/om_th (th = thermal forcing)
@@ -219,23 +302,26 @@ T_dyn_t = @(t) T_dyn_p(T_ampl_t(t));
 
 
 
-%plot temperature profile (animation)
-time = linspace(0,T_th/4+2.5*T_th/4,100);
-figure
-for ii = 1:length(time)
-    plot(nodes_x,T_dyn_t(time(ii)));
-    axis([0,l,0,T_ampl]);
-    title(['T distribution, t = ',num2str(time(ii)),'s']);
-    pause(0.03);
-end
+% %plot temperature profile (animation)
+% time = linspace(0,T_th/4+2.5*T_th/4,100);
+% figure
+% for ii = 1:length(time)
+%     plot(nodes_x,T_dyn_t(time(ii)));
+%     axis([0,l,0,T_ampl]);
+%     title(['T distribution, t = ',num2str(time(ii)),'s']);
+%     pause(0.03);
+% end
 
 
 %add step term to forcing
-t_snap = 3.5*T_th/4 + T_th/4;
-delta_t = 0.3*T_th/4;
-mult = 10; 
+t_snap = 1.5*T_th/4;
+delta_t = 7*T_th/4;
+mult = 25; 
 
-F_ext = @(t) F_ext(t) - mult*F*heaviside(t-t_snap) + mult*F*heaviside(t-t_snap-delta_t);
+F_ext = @(t)  (- mult*F*heaviside(t-t_snap) + mult*F*heaviside(t-t_snap-delta_t));
+time = linspace(0,tint,100);
+figure
+plot(time,F_ext(time));
 
 %% Thermal VMs analysis (just to visualize them)
 % p_sampl = [-p/2;linspace(p/2,l-p/2,3)']; %sample locations of center thermal pulse
@@ -309,7 +395,7 @@ end
 % settings for integration
 % tint = T_th/4; % integration interval
 
-tint = T_th/4+5*T_th/4; % integration interval
+tint = 12*T_th/4;%+5*T_th/4; % integration interval
 
 h = T_fext/50; % time step for integration
 
@@ -369,7 +455,7 @@ u_quasist = quasistatic_solution( BeamAssembly, T_dyn_t, dyn.quasistatic.time );
 dyn.quasistatic.disp = decodeDofsNodes(u_quasist,nNodes,nDofPerNode); % (node, dof of node, tsamp)
 
 % plot results of nonlinear dynamic analysis_______________________________
-plot_dof_location = 0.75; %percentage of length of beam
+plot_dof_location = 0.3; %percentage of length of beam
 node2plot = find_node(plot_dof_location*l,0,[],Nodes); % node to plot
 
 figure('units','normalized','position',[.1 .1 .8 .8]);

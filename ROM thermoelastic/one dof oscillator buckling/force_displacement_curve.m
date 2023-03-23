@@ -4,7 +4,7 @@ clearvars
 
 %enter parameters
 a = 0.2; %horizontal length of beam
-theta = 1e-3; %initial inclination of beam in degs
+theta = 1; %initial inclination of beam in degs
 
 E = 70e9;%Young modulus
 alpha = 23e-6;%23e-6;%linear thermal expansion coeff

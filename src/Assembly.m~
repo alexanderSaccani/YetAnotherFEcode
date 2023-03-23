@@ -344,13 +344,7 @@ classdef Assembly < handle
         end
 
         function u = solve_system(self,K,f,varargin)
-            
-            if nargin < 4 %set f0
-                f0 = zeros(self.Mesh.nDOFs,1);
-            else
-                f0 = varargin{1};
-            end
-            
+            if nargin < 
             if ~isempty(self.Mesh.EBC)
                 [K_bc, f_bc] = self.Mesh.EBC.apply(K,f-f0);
                 u = K_bc\f_bc;
