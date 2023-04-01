@@ -1,12 +1,11 @@
-function [VM,static_eq,omega] = VM_thermal_shell(assembly,n_VMs,varargin)
-%  Author: Alexander Saccani, pHD candidate ETHZ, 12/2022
+function [VM,static_sol,omega] = VM_thermal(assembly,n_VMs,varargin)
+%  Author: Alexander Saccani, pHD candidate ETHZ, 03/2023
 
 %this functions computes the VMs for the structure whose model must be
-%provided in assebmby, for different nodal temperatures configurations (the
-%ones that are stored in vector Tsampl). VMs can be computed around the
-%undeformed configuration (if eq == 0 ) or with respect to the deformed by
-%temperature static configuration (if eq == 1). In this case the output provides
-%also the static deformation.
+%provided in assembly, for different nodal temperatures configurations (the
+%ones that are stored in vector Tsampl). 
+% in varargin put in order the temperature samples and the temperature
+% gradient (if required, e.g. in shell analysis)
 
 T_samples = varargin{1};
 
@@ -24,7 +23,7 @@ MC = assembly.constrain_matrix(M);
 
 %initialize output
 VM = cell(n_configs,1);
-static_eq = zeros(nDofsF,n_configs);
+static_sol = zeros(nDofsF,n_configs);
 omega = zeros(n_VMs,n_configs);
 
 for ii = 1:n_configs
@@ -41,11 +40,11 @@ for ii = 1:n_configs
 
     %compute static equilibrium
     [~,F0ii] = assembly.tangent_stiffness_and_force(zeros(nDofsF,1),argTanStiff{:}); %optimizable
-    assembly.DATA.K = assembly.DATA.Kc;    % this value of K is used only for first guess solution
+    assembly.DATA.K = assembly.DATA.Kc;    % use cold stiffness to compute initial guess (better for convergence of nonlinear solution)
     assembly.DATA.F0 = F0ii;
-    [~,eq_ii] = static_eq(assembly, F, T_ii,gradT_ii); 
+    [~,eq_ii] = static_eq(assembly, F,'vararginTanStiffForce', argTanStiff); %F0 and Kc are used inside this function to compute the initial guess
 
-    static_eq(:,ii) = eq_ii; %static equilibrium
+    static_sol(:,ii) = eq_ii; %static equilibrium
 
     %compute tangent stiffness matrix at static equilibrium (linearized model)
     [K_ii,~] = assembly.tangent_stiffness_and_force(eq_ii,argTanStiff{:});

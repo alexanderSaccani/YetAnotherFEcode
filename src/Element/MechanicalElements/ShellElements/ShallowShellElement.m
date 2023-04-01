@@ -287,6 +287,7 @@ classdef ShallowShellElement < Element
                     
 
         function Kd = stiffness_derivative(obj, p, v)
+            
             % this function compute the derivative of the tangent stiffness 
             % constructed around point p, along the direction v
             
