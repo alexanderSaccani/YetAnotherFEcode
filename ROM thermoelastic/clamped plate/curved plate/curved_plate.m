@@ -32,6 +32,8 @@ myMesh.create_elements_table(elements,myElementConstructor);
 
 nNodes = myMesh.nNodes;
 
+nDofPerNode = 5;
+
 %define z to assign to nodes
 w = height_midspan/Lx;
 R = (Lx/4 + Lx*w^2)/(2*w);
@@ -403,7 +405,7 @@ TForc = 1/fForc;
 Fext = @(t) F0*cos(omForc*t);
 
 %% Define integration time
-tint = 3*timeRamp;
+tint = 2*timeRamp;
 
 %% Integrate full model
 % settings for integration
@@ -442,10 +444,24 @@ dynFull.nlin.time = TI_NL.Solution.time;
 
 %% Construct ROM
 %compute the static solution (to forcing)
-[~,uStatic] = static_eq_shell_thermal(Assembly, F0, zeros(myMesh.nNodes,1), zeros(myMesh.nNodes,1), 'display', 'iter-detailed');
+[~,uStaticF] = static_eq_shell_thermal(Assembly, F0, zeros(myMesh.nNodes,1), zeros(myMesh.nNodes,1), 'display', 'iter-detailed');
+
+%compute the static solution (to temperature)
+argTanStiff = {Tfinal*ones(myMesh.nNodes,1), zeros(myMesh.nNodes,1)};
+[~,Fth] = Assembly.tangent_stiffness_and_force(0*F0,argTanStiff{:});
+Assembly.DATA.K = Assembly.DATA.Kc; %cold T used to predict the response with linear analysis
+Assembly.DATA.F0 = Fth;
+[~,uStaticT] = static_eq(Assembly, 0*F0, 'vararginTanStiffForce',argTanStiff, 'display', 'iter-detailed');
+
+%compute the static solution (to forcing at hot T)
+Assembly.DATA.K = Assembly.DATA.Kc; %cold T used to predict the response with linear analysis
+Assembly.DATA.F0 = Fth;
+[~,uStaticTF] = static_eq(Assembly, F0,  'vararginTanStiffForce',argTanStiff, 'display', 'iter-detailed');
+
 % UNL = reshape(u,5,[]).';        % Nonlinear response
 
-Vcold = orth([VMsCold{1,1},MDsCold{1,1},uStatic]); %reduction basis (cold basis)
+%Vcold = orth([VMsCold{1,1},MDsCold{1,1},uStaticF,uStaticT]);%,uStaticT]);%,uStaticTF]); %reduction basis (cold basis)
+Vcold = orth([VMsCold{1,1},uStaticF,uStaticT]);
 
 V = Vcold;
 
@@ -486,7 +502,7 @@ dynRed.nlin.time = TI_NL_r.Solution.time;
 
 
 %% plot comparison
-plotDofLocation = [0.3,0.5]; %percentage of plate length (along x and y)
+plotDofLocation = [0.3,0.3]; %percentage of plate length (along x and y)
 node2plot = find_node(plotDofLocation(1)*Lx,plotDofLocation(2)*Ly,[],nodes); % node to plot
 
 fontsize = 15;
@@ -495,5 +511,7 @@ figure('units','normalized','position',[0.3,0.3,0.4,0.4]); hold on
 plot(dynFull.nlin.time,squeeze(dynFull.nlin.disp(node2plot,3,:)),'-k','linewidth',linewidth)
 plot(dynRed.nlin.time,squeeze(dynRed.nlin.disp(node2plot,3,:)),'--r','linewidth',linewidth)
 xlabel('time [s]','fontsize',fontsize); ylabel('u [m]','fontsize', fontsize)
+title(['normalized plotted doflocation: ',num2str(plotDofLocation(1)),',',num2str(plotDofLocation(2))]);
 ax = gca; grid on; ax.FontSize = fontsize; legend('HFM','RED','fontsize',fontsize)
+
 

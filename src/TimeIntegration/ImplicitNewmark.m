@@ -62,6 +62,7 @@ classdef ImplicitNewmark < handle
             time = t;
             q = x0;
             qd = xd0;
+            qdd = xdd0;
             q_old = x0;
             qd_old = xd0;
             qdd_old = xdd0;
@@ -117,6 +118,7 @@ classdef ImplicitNewmark < handle
                                 obj.Solution.time = time;
                                 obj.Solution.q = q;
                                 obj.Solution.qd = qd;
+                                obj.Solution.qdd = qdd;
                                 obj.Solution.NR = NR;
                                 obj.Solution.R = R;
                                 obj.Solution.soltime = soltime;
@@ -137,6 +139,7 @@ classdef ImplicitNewmark < handle
                 
                 q = [q q_new];
                 qd = [qd qd_new];
+                qdd = [qdd qdd_new]; %I added this
                 q_old = q_new;
                 qd_old = qd_new;
                 qdd_old = qdd_new;
@@ -146,6 +149,7 @@ classdef ImplicitNewmark < handle
             obj.Solution.time = time;
             obj.Solution.q = q;
             obj.Solution.qd = qd;
+            obj.Solution.qdd = qdd;
             obj.Solution.NR = NR;
             obj.Solution.R = R;
             obj.Solution.soltime = soltime;

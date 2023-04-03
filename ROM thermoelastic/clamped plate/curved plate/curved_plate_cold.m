@@ -17,7 +17,7 @@ set(myMaterial,'YOUNGS_MODULUS',E,'DENSITY',rho,'POISSONS_RATIO',nu,'THERMAL_EXP
 Lx = 0.4;
 Ly = .25;
 thickness = .001;     % thickness of plate
-height_midspan = 1e-8; %height of midspan 
+height_midspan = 4e-3; %height of midspan 
 
 %Mesh______________________________________________________________________
 nx = 15; % # elements along x
@@ -31,6 +31,8 @@ myMesh = Mesh(nodes);
 myMesh.create_elements_table(elements,myElementConstructor);
 
 nNodes = myMesh.nNodes;
+
+nDofPerNode = 5;
 
 %define z to assign to nodes
 w = height_midspan/Lx;
@@ -51,10 +53,10 @@ end
 PlotMesh([nodes,zNodes],elements);
 
 %Boundary conditions: all sides are clamped________________________________
-myMesh.set_essential_boundary_condition([nset{1}],1:5,0)
-myMesh.set_essential_boundary_condition([nset{2}],1:5,0)
-myMesh.set_essential_boundary_condition([nset{3}],1:5,0)
-myMesh.set_essential_boundary_condition([nset{4}],1:5,0)
+myMesh.set_essential_boundary_condition([nset{1}],1:3,0)
+myMesh.set_essential_boundary_condition([nset{2}],1:3,0)
+myMesh.set_essential_boundary_condition([nset{3}],1:3,0)
+myMesh.set_essential_boundary_condition([nset{4}],1:3,0)
 
 %Assembly__________________________________________________________________
 Assembly = Assembly(myMesh);
@@ -77,6 +79,35 @@ Assembly.DATA.M = M; %mass matrix
 Assembly.DATA.C = D; %damping matrix
 
 
+%% Vibration modes (cold)
+% nVMs = 5; % first n_VMs modes with lowest frequency calculated 
+% 
+% Kconstr = Assembly.constrain_matrix(Assembly.DATA.Kc);
+% Mconstr = Assembly.constrain_matrix(Assembly.DATA.M);
+% 
+% [VMsCold,om] = eigs(Kconstr, Mconstr, nVMs, 'SM');
+% [fcold,ind] = sort(sqrt(diag(om))/2/pi);
+% 
+% VMsCold = VMsCold(:,ind);
+% for ii = 1:nVMs
+%     VMsCold(:,ii) = VMsCold(:,ii)/max(sqrt(sum(VMsCold(:,ii).^2,2)));
+% end
+% VMsCold = Assembly.unconstrain_vector(VMsCold);
+% 
+% %plot VMs__________________
+% VMs = cell(nVMs,1);
+% for ii = 1:nVMs  
+%     VMs{ii,1} = reshape(VMsCold(:,ii),5,[]).';    
+% end
+% 
+% for ii = 1:nVMs
+%     figure; hold on;
+%     VM2plot = VMs{ii};
+%     PlotFieldonDeformedMesh([nodes,zNodes],elements, [VM2plot(:,1),...
+%         VM2plot(:,2), VM2plot(:,3)], 'factor',max(nodes(:,2)));
+%     title(['VM ',num2str(ii),', f: ', num2str(fcold(ii)),' Hz']);
+% end
+
 %% VMs and MDs Cold
 
 T_ampls = 0;
@@ -89,7 +120,7 @@ for ii = 1:n_sampl
     T_samples(:,ii) = ones(myMesh.nNodes,1)*T_ampls(ii);
 end
 
-nVMs = 3;
+nVMs = 8;
 
 logic_MD = 1;
 VMMD = VMMD_thermal(Assembly,nVMs,logic_MD,T_samples,gradT_samples);
@@ -154,7 +185,7 @@ end
 % 
 %     F0 = F; %load configuration corresponding to lambda = 1 (load multiplier)
 % 
-%     lam_high = 20; %load multiplier max abs value (symmetric analysis for positive and negative values of lambda from the origin
+%     lam_high = 50; %load multiplier max abs value (symmetric analysis for positive and negative values of lambda from the origin
 % 
 %     %parameters for continuation
 %     Sopt.parametrization = 'orthogonal';
@@ -167,7 +198,7 @@ end
 %     Sopt.dsmax = ds*1000;
 % 
 %     %T samples 
-%     T_samples = [0,5,10];
+%     T_samples = [0];
 %     gradT = zeros(myMesh.nNodes,1);
 % 
 %     %initialize output
@@ -194,7 +225,7 @@ end
 %         fun_residual = @(X) residual_buckling(X,Assembly,F0,T,gradT);
 %         [X1,Solinfo,Sol] = solve_and_continue(u_guess,fun_residual,0,lam_high,ds,Sopt,[],Solopt);
 %         [X2,Solinfo,Sol] = solve_and_continue(u_guess,fun_residual,0,-lam_high,ds,Sopt,[],Solopt);
-% 
+%         
 %         X_buckl_an_ii = [flip(X2,2),X1];
 %         lam_ii = X_buckl_an_ii(end,:);
 %         X_ii = Assembly.unconstrain_vector(X_buckl_an_ii(1:end-1,:));
@@ -279,7 +310,7 @@ end
 
 %% Compute Hot modes and Modal Derivatives
 
-T_ampls = [0,5,10];
+T_ampls = [5,10,15];
 
 n_sampl = length(T_ampls);
 T_samples = zeros(myMesh.nNodes,n_sampl);
@@ -289,15 +320,15 @@ for ii = 1:n_sampl
     T_samples(:,ii) = ones(myMesh.nNodes,1)*T_ampls(ii);
 end
 
-nVMs = 4;
+nVMs = 8;
 
-logic_MD = 0;
+logic_MD = 1;
 VMMD = VMMD_thermal(Assembly,nVMs,logic_MD,T_samples,gradT_samples);
 fhot = VMMD.omega/2/pi;
 VMsHot = VMMD.VMs;
-% MDsHot = VMMD.MDs.data;
-% MDsNames = VMMD.MDs.names;
-% eqPoint = VMMD.eq;
+MDsHot = VMMD.MDs.data;
+MDsNames = VMMD.MDs.names;
+eqPoint = VMMD.eq;
 
 % %Plot equilibrium configuration
 % for jj = 1:length(T_ampls)
@@ -308,23 +339,23 @@ VMsHot = VMMD.VMs;
 %         title(['equilibrium position for uniform dT = ',num2str(T_ampls(jj)),'K']);
 % end
 % 
-% %Plot VMs
-% for jj = 1:length(T_ampls)
-%     
-%     VMs = cell(nVMs,1);
-%     for ii = 1:nVMs  
-%         VMs{ii,1} = reshape(VMsHot{jj}(:,ii),5,[]).';    
-%     end
-% 
-%     for ii = 1:nVMs
-%         figure; hold on;
-%         VM2plot = VMs{ii};
-%         PlotFieldonDeformedMesh([nodes,zNodes],elements, [VM2plot(:,1),...
-%             VM2plot(:,2), VM2plot(:,3)], 'factor',5*max(nodes(:,2)));
-%         title(['VM ',num2str(ii),' dT = ',num2str(T_ampls(jj)),'K, f: ', num2str(fhot(ii,jj)),' Hz']);
-%     end
-% 
-% end
+%Plot VMs
+for jj = 1:length(T_ampls)
+    
+    VMs = cell(nVMs,1);
+    for ii = 1:nVMs  
+        VMs{ii,1} = reshape(VMsHot{jj}(:,ii),5,[]).';    
+    end
+
+    for ii = 1:nVMs
+        figure; hold on;
+        VM2plot = VMs{ii};
+        PlotFieldonDeformedMesh([nodes,zNodes],elements, [VM2plot(:,1),...
+            VM2plot(:,2), VM2plot(:,3)], 'factor',5*max(nodes(:,2)));
+        title(['VM ',num2str(ii),' dT = ',num2str(T_ampls(jj)),'K, f: ', num2str(fhot(ii,jj)),' Hz']);
+    end
+
+end
 % 
 % 
 % %plot MDs
@@ -347,81 +378,46 @@ VMsHot = VMMD.VMs;
 % 
 % end
 
-% Plot VMs (all together)
-indSubPlot = [221 222 223 224];
-for jj = 1:length(T_ampls)
-    
-    figure('units','normalized','position',[0.3,0.3,0.5,0.5])
-    VMs = cell(nVMs,1);
-    for ii = 1:nVMs  
-        VMs{ii,1} = reshape(VMsHot{jj}(:,ii),5,[]).';    
-    end
-
-    for ii = 1:nVMs
-        subplot(indSubPlot(ii));
-        VM2plot = VMs{ii};
-        PlotFieldonDeformedMesh([nodes,zNodes],elements, [VM2plot(:,1),...
-            VM2plot(:,2), VM2plot(:,3)], 'factor',10*max(nodes(:,2)));
-        title(['VM ',num2str(ii),' dT = ',num2str(T_ampls(jj)),'K, f: ', num2str(fhot(ii,jj)),' Hz']);
-        colorbar('off')
-    end
-
-end
-
 
 
 %% Define dynamic temperature variation
 
-%define the shape of T distribution
-% Tshape = 1*ones(myMesh.nNodes,1);
-
-%Gaussian temperature
-sigma3X = Lx/5;
-sigma3Y = Ly/5;
-
-theta = 0;
-xc = Lx/5;
-yc = Ly/
-
-nodesX = nodes(:,1);
-nodesY = nodes(:,2);
-
-a = cos(theta)^2/(2*sigmaX^2) + sin(theta)^2/(2*sigmaY^2);
-b = - sin(2*theta)/(4*sigmaX^2) + sin(2*theta)/(4*sigmaY^2);
-c = sin(theta)^2/(2*sigmaX^2) + cos(theta)^2/(2*sigmaY^2);
-
-Tshape = exp( -( a*(nodesX-xc).^2 +2*b*(nodesX-xc).*(nodesY-yc) +c*(nodesY-yc).^2) ); %gaussian with center at xc,yc inclined of angle theta w.r.t. x axis
-
-
-
+T0 = 1*ones(myMesh.nNodes,1);
 Tinitial = 0;
-Tfinal = 7;
+Tfinal = 0;
 eps = 0.1; 
 timeRamp = 1/fcold(1)/eps;
 
-Tdynt = @(t) Tshape*(Tfinal - Tinitial)/timeRamp*t + (Tshape*Tfinal - Tshape*(Tfinal - Tinitial)/timeRamp*t)*heaviside(t-timeRamp);
+Tdynt = @(t) T0*(Tfinal - Tinitial)/timeRamp*t + (T0*Tfinal - T0*(Tfinal - Tinitial)/timeRamp*t)*heaviside(t-timeRamp);
 gradTt = @(t) zeros(myMesh.nNodes,1);
 
-
 %% Define forcing
+% F0 = zeros(myMesh.nDOFs,1);
+
+% nf = find_node(Lx/3,Ly/3,[],myMesh.nodes); % node where to put the force
+% node_force_dofs = get_index(nf, myMesh.nDOFPerNode );
+% F0(node_force_dofs(3)) = +260;
+
+%pressure (triangular)
+nodesX = nodes(:,1);
+Fmax = 5000/length(nodes);
+Fmin = 0;
+Fz = nodesX*Fmax/Lx;
 F0 = zeros(myMesh.nDOFs,1);
+F0(3:5:end) = Fz;
 
-nf = find_node(Lx/2,Ly/2,[],myMesh.nodes); % node where to put the force
-node_force_dofs = get_index(nf, myMesh.nDOFPerNode );
-F0(node_force_dofs(3)) = +70;
-
-fForc = (fcold(1)+fcold(2))/2;
+fForc = 207;% tra la terza e quarta fredde, tra la prima e la seconda calda(fcold(1)+fcold(2))/2;
 omForc = 2*pi*fForc;
 TForc = 1/fForc;
 
 Fext = @(t) F0*cos(omForc*t);
 
 %% Define integration time
-tint = 3*timeRamp;
+tint = timeRamp/2;
 
 %% Integrate full model
 % settings for integration
-h = 2*pi/omForc/50; % time step for integration
+h = 2*pi/omForc/25; % time step for integration
 
 % Initial condition: equilibrium
 nDofFull = length(Assembly.Mesh.EBC.unconstrainedDOFs);
@@ -444,7 +440,7 @@ uDynFull = TI_NL.Solution.q;
 
 %save solution
 uDynFull = Assembly.unconstrain_vector(uDynFull); 
-dynFull.nlin.disp = decodeDofsNodes(uDynFull,nNodes,nDofPerNode); % (node, dof of node, tsamp)
+dynFull.nlin.disp = decodeDofsNodes(uDynFull,nNodes,5); % (node, dof of node, tsamp)
 dynFull.nlin.time = TI_NL.Solution.time;
 
 
@@ -454,8 +450,63 @@ dynFull.nlin.time = TI_NL.Solution.time;
 % figure
 % plot(dynFull.nlin.time,squeeze(dynFull.nlin.disp(node2plot,3,:)))
 
+%% integrate linearized model
+% settings for integration
+h = 2*pi/omForc/25; % time step for integration
+
+% Initial condition: equilibrium
+nDofFull = length(Assembly.Mesh.EBC.unconstrainedDOFs);
+
+q0 = zeros(nDofFull,1);
+qd0 = zeros(nDofFull,1);
+qdd0 = zeros(nDofFull,1);
+
+% Instantiate object for nonlinear time integration
+TI_LIN = ImplicitNewmark('timestep',h,'alpha',0.005,'linear',true);
+
+% nonlinear Residual evaluation function handle
+residualFullLin = @(q,qd,qdd,t)residual_thermal_linear(q,qd,qdd,t,Assembly,Fext,Tdynt,gradTt);
+
+% integrate equations with Newmark scheme
+TI_LIN.Integrate(q0,qd0,qdd0,tint,residualFullLin);
+
+% project to full space
+uDynFullLin = TI_LIN.Solution.q;
+
+%save solution
+uDynFullLin = Assembly.unconstrain_vector(uDynFullLin); 
+dynFull.lin.disp = decodeDofsNodes(uDynFullLin,nNodes,5); % (node, dof of node, tsamp)
+dynFull.lin.time = TI_LIN.Solution.time;
+
+plot_dof_location = [0.5,0.5]; %percentage of length of beam
+node2plot = find_node(plot_dof_location(1)*Lx,plot_dof_location(2)*Ly,[],nodes); % node to plot
+
+figure
+plot(dynFull.nlin.time,squeeze(dynFull.nlin.disp(node2plot,3,:)))
+hold on
+plot(dynFull.lin.time,squeeze(dynFull.lin.disp(node2plot,3,:)))
+legend('NL','LIN')
+
 %% Construct ROM
-Vcold = orth([VMsCold{1,1},MDsCold{1,1}]); %reduction basis (cold basis)
+%compute the static solution (to forcing)
+[~,uStaticF] = static_eq_shell_thermal(Assembly, F0, zeros(myMesh.nNodes,1), zeros(myMesh.nNodes,1), 'display', 'iter-detailed');
+
+%compute the static solution (to temperature)
+argTanStiff = {Tfinal*ones(myMesh.nNodes,1), zeros(myMesh.nNodes,1)};
+[~,Fth] = Assembly.tangent_stiffness_and_force(0*F0,argTanStiff{:});
+Assembly.DATA.K = Assembly.DATA.Kc; %cold T used to predict the response with linear analysis
+Assembly.DATA.F0 = Fth;
+[~,uStaticT] = static_eq(Assembly, 0*F0, 'vararginTanStiffForce',argTanStiff, 'display', 'iter-detailed');
+
+%compute the static solution (to forcing at hot T)
+Assembly.DATA.K = Assembly.DATA.Kc; %cold T used to predict the response with linear analysis
+Assembly.DATA.F0 = Fth;
+[~,uStaticTF] = static_eq(Assembly, F0,  'vararginTanStiffForce',argTanStiff, 'display', 'iter-detailed');
+
+% UNL = reshape(u,5,[]).';        % Nonlinear response
+
+%Vcold = orth([VMsCold{1,1},MDsCold{1,1},uStaticF,uStaticT]);%,uStaticT]);%,uStaticTF]); %reduction basis (cold basis)
+Vcold = orth([VMsCold{1,1},MDsCold{1,1}]);
 
 V = Vcold;
 
@@ -469,7 +520,7 @@ gradTred = zeros(nNodes,1);
 
 %% Integrate nonlinear ROM (constant basis)
 % settings for integration
-h = 2*pi/omForc/50; % time step for integration
+h = 2*pi/omForc/25; % time step for integration
 
 % Initial condition: equilibrium
 nDofRed = size(V,2);
@@ -488,29 +539,58 @@ residual_r = @(q,qd,qdd,t)residual_thermal_reduced_nonlinear(q,qd,qdd,t,redAssem
 TI_NL_r.Integrate(q0,qd0,qdd0,tint,residual_r);
 
 % project to full space
-uDynRed = Vcold*TI_NL_r.Solution.q;
+uDynRed = V*TI_NL_r.Solution.q;
+vDynRed = V*TI_NL_r.Solution.qd; 
+aDynRed = V*TI_NL_r.Solution.qdd;
 
 %save solution
 dynRed.nlin.disp = decodeDofsNodes(uDynRed,nNodes,nDofPerNode); % (node, dof of node, tsamp)
 dynRed.nlin.time = TI_NL_r.Solution.time;
 
+%% compute error
+nodesErr = 1:1:size(nodes,1);
+gdlErr = 1:5;
+
+%RMS error
+errROM = RMS_error_ROM(dynFull.nlin.disp,dynFull.nlin.time,dynRed.nlin.disp,dynRed.nlin.time,gdlErr,nodesErr);
+
+%err Res
+ROMdisp = Assembly.constrain_vector(uDynRed);
+ROMvel = Assembly.constrain_vector(vDynRed);
+ROMacc = Assembly.constrain_vector(aDynRed);
+ROMtime = dynRed.nlin.time;
+errRes = residual_error_ROM(residualFull,ROMdisp,ROMvel,ROMacc,ROMtime);
 
 %% plot comparison
-plotDofLocation = [0.3,0.5]; %percentage of plate length (along x and y)
+plotDofLocation = [0.5,0.5]; %percentage of plate length (along x and y)
 node2plot = find_node(plotDofLocation(1)*Lx,plotDofLocation(2)*Ly,[],nodes); % node to plot
+dofPl = 1;
 
 fontsize = 15;
 linewidth = 2;
-figure('units','normalized','position',[0.3,0.3,0.4,0.4]); hold on
-plot(dynFull.nlin.time,squeeze(dynFull.nlin.disp(node2plot,3,:)),'-k','linewidth',linewidth)
-plot(dynRed.nlin.time,squeeze(dynRed.nlin.disp(node2plot,3,:)),'--r','linewidth',linewidth)
+figure('units','normalized','position',[0.3,0.3,0.6,0.7]); 
+subplot 311; hold on
+plot(dynFull.nlin.time,squeeze(dynFull.nlin.disp(node2plot,dofPl,:)),'-k','linewidth',linewidth)
+plot(dynRed.nlin.time,squeeze(dynRed.nlin.disp(node2plot,dofPl,:)),'--r','linewidth',linewidth)
+plot(dynFull.lin.time,squeeze(dynFull.lin.disp(node2plot,dofPl,:)),'--b','linewidth',linewidth)
 xlabel('time [s]','fontsize',fontsize); ylabel('u [m]','fontsize', fontsize)
-ax = gca; grid on; ax.FontSize = fontsize; legend('HFM','RED','fontsize',fontsize)
-
-
-
-
-
+title(['normalized plotted dof location: ',num2str(plotDofLocation(1)),',',...
+    num2str(plotDofLocation(2)),',  dof: ',num2str(dofPl)]);
+ax = gca; grid on; ax.FontSize = fontsize; legend('HFM','RED','LIN','fontsize',fontsize)
+subplot 312
+plot(dynFull.nlin.time,errROM,'-k','linewidth',linewidth)
+title('normalized RMS error');
+xlabel('time [s]','fontsize', fontsize);
+ylabel('error', 'fontsize', fontsize);
+ax = gca; grid on; ax.FontSize = fontsize;
+text('Units', 'Normalized', 'Position', [0.1, 0.1], 'string',...
+    'reduction basis: first 8 VMs cold and MDs, nDofRed = 42 ', 'fontsize', 16)
+subplot 313
+plot(dynRed.nlin.time,errRes,'-b','linewidth',linewidth)
+title('full residual at ROM solution');
+xlabel('time [s]','fontsize', fontsize);
+ylabel('error', 'fontsize', fontsize);
+ax = gca; grid on; ax.FontSize = fontsize;
 
 
 
