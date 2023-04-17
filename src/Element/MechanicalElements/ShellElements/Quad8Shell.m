@@ -99,8 +99,27 @@ classdef Quad8Shell < ShallowShellElement
             
             out = obj.shape_function(X)*obj.z; 
             
-        end            
-        
+        end          
+
+        %gauss to nodes matrices
+        function out = gauss_to_nodes(obj)
+            
+            if (obj.quadrature.Ng == 2)
+                
+  out = [       0.1340   -0.5000   -0.5000    1.8660;
+               -0.5000    1.8660    0.1340   -0.5000;
+                1.8660   -0.5000   -0.5000    0.1340;
+               -0.5000    0.1340    1.8660   -0.5000;
+               -0.1830    0.6830   -0.1830    0.6830;
+                0.6830    0.6830   -0.1830   -0.1830;
+                0.6830   -0.1830    0.6830   -0.1830;
+               -0.1830   -0.1830    0.6830    0.6830];
+
+            else
+                error('method to extract field at nodes from field at gauss points not specified for Ng > 2')
+            end
+
+        end
         
         %initialize extraction matrices
         function initialize_extraction_matrices(obj)

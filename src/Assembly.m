@@ -277,7 +277,6 @@ classdef Assembly < handle
 
         end
 
-
         function Kc = constrain_matrix(self,K)
             if ~isempty(self.Mesh.EBC)
                 Kc = K(self.Mesh.EBC.unconstrainedDOFs,self.Mesh.EBC.unconstrainedDOFs);
@@ -341,6 +340,73 @@ classdef Assembly < handle
             for ii = 1 : length(ind_free)
                 ind_cons(ii) = find( self.Mesh.EBC.unconstrainedDOFs == ind_free(ii));
             end
+        end
+
+        function field = get_field(obj,elementsConn,nodeSet,elementMethodName,nOut,varargin)
+            %function that returns the field requested at nodal coordinates
+
+            nNodes = obj.Mesh.nNodes;
+            nElements = obj.Mesh.nElements;
+            nNodesPerElement = size(elementsConn,2);
+
+            ii = kron(1:nElements,ones(1,nNodesPerElement)); 
+            jj = reshape(elementsConn.',1,[]);
+            kk = true(1,nNodesPerElement*nElements);
+            elementsNodesTable = sparse(ii,jj,kk);
+            
+            flag = false;
+            if ischar(nodeSet)
+                if strcmp(nodeSet, 'all')
+                    flag = true;
+                    nodeSet = (1:obj.Mesh.nNodes)';
+                else
+                    error(['invalid node set: specify valid node values or ...' ...
+                        'enter "all" in char array to compute the field in all nodes'])
+                end
+            end
+
+            elementsNodesSet = elementsNodesTable(:,nodeSet);
+            elementsSet = find(any(elementsNodesSet,2)); %index of elements that require evaluation
+            lenElementsSet = length(elementsSet);
+
+            lenNodesSet = length(nodeSet);
+            if not(flag)
+                boolNodeSet = sparse(nodeSet,1,true(lenNodesSet,1),nNodes,1);
+            end
+            
+            if flag 
+                field = zeros(nNodes,nOut); %initialize field output
+                numbElContributions = zeros(nNodes,1); %keep track of number of contributions
+            else
+                field = spalloc(nNodes,nOut,nOut*lenNodesSet*6); %initialize field output (use spalloc for speed)
+                numbElContributions = spalloc(nNodes,1,lenNodesSet*6); %keep track of number of contribution
+            end
+
+            for ii = 1:lenElementsSet 
+
+                nEl = elementsSet(ii);
+                thisEl = obj.Mesh.Elements(nEl).Object;
+                nodeIDsEl = thisEl.nodeIDs;
+                
+                if flag
+                    nodeIDsRequired = nodeIDsEl;
+                else
+                    nodeIDsRequired = nodeIDsEl((boolNodeSet(nodeIDsEl)));
+                end
+
+                fieldEl = thisEl.(elementMethodName)(nodeIDsRequired,varargin{:});
+                % this functions returns back the field value at specified
+                % nodes, it must be a length(nodeIDsRequired,nOut)
+
+                field(nodeIDsRequired,:) = field(nodeIDsRequired,:) + fieldEl;
+                numbElContributions(nodeIDsRequired) = numbElContributions(nodeIDsRequired) ...
+                                           + 1;
+            end
+
+            %avg the contribututions of different elements (non weighted
+            %average)
+            field = field(nodeSet,:)./numbElContributions(nodeSet); 
+            field = full(field);
         end
 
         function u = solve_system(self,K,f,varargin)

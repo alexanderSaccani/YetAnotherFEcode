@@ -8,7 +8,7 @@ clc
 E       = 70e9;     % Young's modulus [Pa]
 rho     = 2700;     % density [kg/m^3]
 nu      = 0.33;     % Poisson's ratio 
-thickness = .1;     % [m] beam's out-of-plane thickness
+thickness = .01;     % [m] beam's out-of-plane thickness
 alpha_T = 11.7e-7; % thermal expansion coefficient
 
 % Material
@@ -20,10 +20,9 @@ myElementConstructor = @()Quad8Shell(thickness, myMaterial);
 
 % MESH_____________________________________________________________________
 Lx = 1;
-Ly = 1;
-nx = 1
-;
-ny = 1;
+Ly = 0.3;
+nx = 30;
+ny = 8;
 
 [nodes, elements, nset] = mesh_2Drectangle(Lx,Ly,nx,ny,'QUAD8');
 
@@ -31,54 +30,120 @@ ny = 1;
 myMesh = Mesh(nodes);
 myMesh.create_elements_table(elements,myElementConstructor);
 
-%%
-objp = myMesh.Elements(1).Object;
-X = zeros(620,1);
-T = zeros(124,1);
-gradT = zeros(124,1);
-[K,F] = objp.tangent_stiffness_and_force(X,T,gradT);
+elements2plot = elements(:,1:4);
+PlotMesh(nodes,elements2plot,0) 
 
 %% Boundary conditions
- myMesh.set_essential_boundary_condition([1,4],1:5,0)
+myMesh.set_essential_boundary_condition(nset{1},1:5,0);
+% myMesh.set_essential_boundary_condition(nset{3},1:5,0);
 
 %% Assembly
-%T field
-T = 100*ones(8,1);
-gradT = 0*randn(8,1);
-
 Assembly = Assembly(myMesh);
+
+%tang stiff 
 M = Assembly.mass_matrix();
 nNodes = size(nodes,1);
 u0 = zeros( myMesh.nDOFs, 1);
-[K,~] = Assembly.tangent_stiffness_and_force(u0,T,gradT);
-K = full(K);
-M = full(M);
-
-isKsymm = K-K';
-isMsymm = M-M';
+[K,~] = Assembly.tangent_stiffness_and_force(u0,zeros(myMesh.nNodes,1),zeros(myMesh.nNodes,1));
 
 % store matrices
 Assembly.DATA.K = K;
 Assembly.DATA.M = M;
-
-PlotMesh(nodes,elements);
 
 Kc = Assembly.constrain_matrix(K);
 Mc = Assembly.constrain_matrix(M);
 
 %% Static analysis 
 % Nodal force
-F = zeros(myMesh.nDOFs,1);
-nf = 2; % node where to put the force
+F0 = zeros(myMesh.nDOFs,1);
+nf = find_node(Lx,Ly/2,[],myMesh.nodes); % node where to put the force
 node_force_dofs = get_index(nf, myMesh.nDOFPerNode );
+F0(node_force_dofs(2)) = +150;
 
-F(node_force_dofs(5)) = +10e5;
-F(node_force_dofs(5)) = 0;
+% %distr load
+% node_force_dofs = get_index(nset{3}, myMesh.nDOFPerNode );
+% node_force_dofs = reshape(node_force_dofs,5,[]);
+% node_force_dofs = node_force_dofs(1,:); %load applied along x
+% F0(node_force_dofs') = 120;
 
-u_lin = Assembly.solve_system(K, F);
-u_lin = reshape(u_lin,5,[]);
+T = 0*ones(myMesh.nNodes,1);
+gradT = zeros(myMesh.nNodes,1);
+
+[~,uStaticF] = static_eq_shell_thermal(Assembly, F0, T,gradT, 'display', 'iter-detailed');
 
 
+method = 'membrane_forces';
+% nodeSet = 'all';
+nodeSet = 'all';
+nOut = 3;
+field = Assembly.get_field(elements,nodeSet,method,nOut,uStaticF,T,gradT);
+
+%%
+elements2plot = elements(:,1:4);
+
+figure
+PlotFieldonMesh(nodes,elements2plot ,field(:,1));
+title('Nx')
+
+figure
+PlotFieldonMesh(nodes,elements2plot ,field(:,2));
+title('Ny')
+
+figure
+PlotFieldonMesh(nodes,elements2plot ,field(:,3));
+title('Nxy')
+
+disp = reshape(uStaticF,5,[]).';
+disp = disp(:,1:3);
+figure
+PlotFieldonDeformedMesh([nodes,zeros(size(nodes,1),1)],elements2plot,disp);
+title('disp')
+
+nodeset1 = zeros(ny+1,1);
+for ii = 1:ny+1
+nf = find_node(Lx/nx*18,Ly/ny*(ii-1),[],myMesh.nodes); % node where to put the force
+nodeset1(ii) = nf;
+end
+xnodeset1 = nodes(nodeset1,1);
+ynodeset1 = nodes(nodeset1,2);
+
+nset2plot = nodeset1;
+
+% indNodeSetLx = get_index(nset2plot, myMesh.nDOFPerNode );
+% indNodeSetLx = reshape(indNodeSetLx,5,[]);
+% indNodeSetLxX = indNodeSetLx(1,:).';
+% indNodeSetLxY = indNodeSetLx(2,:).';
+%xNodeSet = nodes(nset{3},1);
+yNodeSetLx = nodes(nset2plot,2);
+
+figure
+plot(yNodeSetLx,disp(nset2plot,1),'*');
+title('disp along x')
+
+method = 'membrane_forces';
+% nodeSet = 'all';
+nOut = 3;
+fieldLx = Assembly.get_field(elements,nset2plot,method,nOut,uStaticF,T,gradT);
+
+figure 
+plot(yNodeSetLx,fieldLx(:,1),'x')
+hold on
+plot(yNodeSetLx,field(nset2plot,1),'--')
+title('membrane Field X')
+
+figure 
+plot(yNodeSetLx,fieldLx(:,2),'x')
+hold on
+plot(yNodeSetLx,field(nset2plot,2),'--')
+title('membrane Field Y')
+
+figure 
+plot(yNodeSetLx,fieldLx(:,3),'x')
+hold on
+plot(yNodeSetLx,field(nset2plot,3),'--')
+title('membrane Field XY')
+
+return
 % figure 
 % hold on
 % scl = 20;

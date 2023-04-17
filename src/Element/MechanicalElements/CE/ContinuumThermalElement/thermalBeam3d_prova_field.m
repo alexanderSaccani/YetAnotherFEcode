@@ -46,11 +46,11 @@ end
 Lx = 0.4;
 Ly = .25;
 t = .001;
-height_midspan = 0.008;
+height_midspan = 0.000008;
 
 
-nx = 30;
-ny = 20;
+nx = 20;
+ny = 10;
 nz = 2;
 
 
@@ -78,8 +78,10 @@ myMesh.create_elements_table(elements,myElementConstructor);
 PlotMesh(nodes,elements,0);
 
 % MESH > BOUNDARY CONDITONS
-myMesh.set_essential_boundary_condition([nset{1} nset{4}],1:3,0)
-myMesh.set_essential_boundary_condition([nset{2} nset{5}],1:3,0)
+myMesh.set_essential_boundary_condition([nset{1}],1:3,0) %cantilever beam
+
+% myMesh.set_essential_boundary_condition([nset{1} nset{4}],1:3,0)
+% myMesh.set_essential_boundary_condition([nset{2} nset{5}],1:3,0)
 
 %myMesh.set_essential_boundary_condition([nset{1}],1:3,0)
 
@@ -112,7 +114,7 @@ for ii = 1:n_VMs
     V0(:,ii) = V0(:,ii)/max(sqrt(sum(V0(:,ii).^2,2)));
 end
 V0 = BeamAssembly.unconstrain_vector(V0);
-
+% 
 % PLOT
 for mod = [1,2,3]
 figure('units','normalized','position',[.2 .1 .6 .8])
@@ -125,12 +127,12 @@ end
 
 %% static analysis
 F = zeros(myMesh.nDOFs,1);
-nf = find_node(Lx/2,Ly/2,t,nodes); % node where to put the force
+nf = find_node(Lx/2,Ly/4,t,nodes); % node where to put the force
 node_force_dofs = get_index(nf, myMesh.nDOFPerNode );
-F(node_force_dofs(3)) = +50;
+F(node_force_dofs(3)) = +5;
 
 %Temperature field
-T = 10*ones(nNodes,1);
+T = 0.0001*ones(nNodes,1);
 
 %extract tangent stiffness for linear solution
 u0 = zeros( myMesh.nDOFs, 1);
@@ -138,7 +140,11 @@ u0 = zeros( myMesh.nDOFs, 1);
 
 u_lin = BeamAssembly.solve_system(K, F-gth);
 ULIN = reshape(u_lin,3,[]).';	% Linear response
-[~,u] = static_equilibrium_thermal(BeamAssembly, F, T, 'display', 'iter-detailed');
+
+
+BeamAssembly.DATA.F0 = zeros(myMesh.nDOFs,1);
+BeamAssembly.DATA.K = K_cold;
+[u_lin,u] = static_eq(BeamAssembly, F, 'vararginTanStiffForce',{T}, 'display', 'iter-detailed');
 UNL = reshape(u,3,[]).';        % Nonlinear response
 
 %linear solution
@@ -167,6 +173,40 @@ PlotMesh(nodes,elements);
 title('non linear static solution');
 grid on
 axis
+
+%extract field of cauchy stresses
+method = 'cauchy_stress';
+nodeSet = 'all';
+nOut = 6;
+field = BeamAssembly.get_field(elements,nodeSet,method,nOut,u,T);
+
+%%
+elements2plot = elements;
+
+figure
+PlotFieldonMesh(nodes,elements2plot ,field(:,1));
+title('\sigma_x')
+
+figure
+PlotFieldonMesh(nodes,elements2plot ,field(:,2));
+title('\sigma_y')
+
+figure
+PlotFieldonMesh(nodes,elements2plot ,field(:,3));
+title('\sigma_z')
+
+figure
+PlotFieldonMesh(nodes,elements2plot ,field(:,4));
+title('\tau_{xy}')
+
+figure
+PlotFieldonMesh(nodes,elements2plot ,field(:,5));
+title('\tau_{xz}')
+
+figure
+PlotFieldonMesh(nodes,elements2plot ,field(:,6));
+title('\tau_{yz}')
+
 
 %% analyze equilibrium point
 

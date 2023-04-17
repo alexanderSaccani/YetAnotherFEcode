@@ -407,6 +407,171 @@ classdef ShallowShellElement < Element
             end
             
         end
+
+        function Nfield = membrane_forces(obj,nodeIDsQueried,p,T,gradT)
+
+            %extract element data from full vector of unknowns
+            [pe,Te,gradTe]  = extract_element_data(obj,p,T,gradT);
+
+            %extract membrane forces at gauss points
+            %get the specifications for element integration
+            X = obj.quadrature.X; %get quadrature points (natural coordinates)
+            
+            %material properites
+            alpha = obj.initialization.alpha; %thermal expansion coefficient
+            Cgamma = obj.initialization.Cgamma; %shear material constitutive law
+            
+            %retrieve strain displacements matricies
+            H = obj.initialization.H;
+            AEfun = obj.initialization.AEfun;
+            
+            %retrieve membrane - bending constitutive matrices:
+            Cm = obj.initialization.Cm;
+            Cb = obj.initialization.Cb; 
+            
+            NintPoints = size(X,2);
+            
+            %initialize membrane force vector at Gauss Points (row -> gauss
+            %point, column -> Nx, Ny, Nxy
+            membraneForcesGauss = zeros(NintPoints,3); %[Nx, Ny, Nxy]
+            
+
+            for ii = 1:NintPoints
+
+               xii = X(:,ii); %gauss point (natural coordinates)
+               
+               %shape functions for the derivatives and detJ
+               [shFun,G,detJ] = obj.Gfun(xii); %if you initialize this object, the memory req. increase, but you are faster online
+               
+               dwdx = G.Gw*pe; %dwdx
+               thxy = [shFun*obj.initialization.EMthx; %[thx;thy]
+                         shFun*obj.initialization.EMthy];
+               
+               %compute the B matrices
+               BE = H*G.Guv + AEfun(dwdx,G.dzdx)*G.Gw;
+               Bgamma = thxy + G.Gw;
+               Bchi = H*G.Gthxy;
+               shape_fun = obj.shape_function(xii); %used to extract T and GradT
+               
+               %extract the temperature and temperature gradient at Gauss
+               %point               
+               Tg =  shape_fun*Te;
+               gradTg = shape_fun*gradTe;
+               
+               %compute the internal actions
+               membraneForcesGauss(ii,:) = (Cm*(BE*pe - alpha*Tg))'; %membrane internal actions
+               
+               M = Cb*(Bchi*pe - alpha*gradTg); %bending internal actions
+               V = Cgamma*Bgamma*pe; %out of plane shear internal actions
+
+            end
+            
+            %extrapolate value of field from gauss points to nodes
+            gauss2NodesMatrix = obj.gauss_to_nodes();
+            gauss2QueriedNodesMatrix = gauss2NodesMatrix(ismember(obj.nodeIDs,nodeIDsQueried),:);
+            Nfield = gauss2QueriedNodesMatrix*membraneForcesGauss;
+            
+        end
+
+
+        function Mbfield = bending_moments(obj,nodeIDsQueried,p,T,gradT)
+
+            %extract element data from full vector of unknowns
+            [pe,Te,gradTe]  = extract_element_data(obj,p,T,gradT);
+
+            %extract membrane forces at gauss points
+            %get the specifications for element integration
+            X = obj.quadrature.X; %get quadrature points (natural coordinates)
+            
+            %material properites
+            alpha = obj.initialization.alpha; %thermal expansion coefficient
+            
+            %retrieve strain displacements matricies
+            H = obj.initialization.H;
+            
+            %retrieve bending constitutive matrices:
+            Cb = obj.initialization.Cb; 
+            
+            NintPoints = size(X,2);
+            
+            %initialize membrane force vector at Gauss Points (row -> gauss
+            %point, column -> Mx, My, Mxy
+            momentsGauss = zeros(NintPoints,3); %[Mx, My, Mxy]
+            
+
+            for ii = 1:NintPoints
+
+               xii = X(:,ii); %gauss point (natural coordinates)
+               
+               %shape functions for the derivatives and detJ
+               [shFun,G,detJ] = obj.Gfun(xii); %if you initialize this object, the memory req. increase, but you are faster online
+               
+               %compute the B matrices
+               Bchi = H*G.Gthxy;
+               shape_fun = obj.shape_function(xii); %used to extract T and GradT
+               
+               %extract the temperature and temperature gradient at Gauss
+               %point               
+               Tg =  shape_fun*Te;
+               gradTg = shape_fun*gradTe;
+               
+               %compute the internal actions
+               momentsGauss(ii,:) = (Cb*(Bchi*pe - alpha*gradTg))'; %membrane internal actions
+
+            end
+            
+            %extrapolate value of field from gauss points to nodes
+            gauss2NodesMatrix = obj.gauss_to_nodes();
+            gauss2QueriedNodesMatrix = gauss2NodesMatrix(ismember(obj.nodeIDs,nodeIDsQueried),:);
+            Mbfield = gauss2QueriedNodesMatrix*momentsGauss;
+            
+        end
+
+
+
+        function Vfield = shear_forces(obj,nodeIDsQueried,p,T,gradT)
+
+            %extract element data from full vector of unknowns
+            [pe,Te,gradTe]  = extract_element_data(obj,p,T,gradT);
+
+            %extract membrane forces at gauss points
+            %get the specifications for element integration
+            X = obj.quadrature.X; %get quadrature points (natural coordinates)
+            
+            %material properites
+            Cgamma = obj.initialization.Cgamma; %shear material constitutive law
+ 
+            NintPoints = size(X,2);
+            
+            %initialize shear force vector at Gauss Points (row -> gauss
+            %point, column -> Vx, Vy
+            shearForcesGauss = zeros(NintPoints,2); %[Vx, Vy] %shear force (z direction)
+            
+
+            for ii = 1:NintPoints
+
+               xii = X(:,ii); %gauss point (natural coordinates)
+               
+               %shape functions for the derivatives and detJ
+               [shFun,G,detJ] = obj.Gfun(xii); %if you initialize this object, the memory req. increase, but you are faster online
+               
+               thxy = [shFun*obj.initialization.EMthx; %[thx;thy]
+                         shFun*obj.initialization.EMthy];
+               
+               %compute the B matrix
+               Bgamma = thxy + G.Gw;
+               
+               %compute out of plane shear internal actions
+               shearForcesGauss(ii,:) = (Cgamma*Bgamma*pe)'; %membrane internal actions
+
+            end
+            
+            %extrapolate value of field from gauss points to nodes
+            gauss2NodesMatrix = obj.gauss_to_nodes();
+            gauss2QueriedNodesMatrix = gauss2NodesMatrix(ismember(obj.nodeIDs,nodeIDsQueried),:);
+            Vfield = gauss2QueriedNodesMatrix*shearForcesGauss;
+            
+        end
         
         
            

@@ -34,6 +34,8 @@ nNodes = myMesh.nNodes;
 
 nDofPerNode = 5;
 
+elementsPlot = elements(:,1:4); %for plots
+
 %define z to assign to nodes
 w = height_midspan/Lx;
 R = (Lx/4 + Lx*w^2)/(2*w);
@@ -50,7 +52,9 @@ for ii = 1:myMesh.nElements
 end
 
 %plot mesh
-PlotMesh([nodes,zNodes],elements);
+figure
+PlotMesh([nodes,zNodes],elementsPlot);
+axis on
 
 %Boundary conditions: all sides are clamped________________________________
 myMesh.set_essential_boundary_condition([nset{1}],1:3,0)
@@ -103,7 +107,7 @@ Assembly.DATA.C = D; %damping matrix
 % for ii = 1:nVMs
 %     figure; hold on;
 %     VM2plot = VMs{ii};
-%     PlotFieldonDeformedMesh([nodes,zNodes],elements, [VM2plot(:,1),...
+%     PlotFieldonDeformedMesh([nodes,zNodes],elementsPlot, [VM2plot(:,1),...
 %         VM2plot(:,2), VM2plot(:,3)], 'factor',max(nodes(:,2)));
 %     title(['VM ',num2str(ii),', f: ', num2str(fcold(ii)),' Hz']);
 % end
@@ -131,22 +135,22 @@ MDsNames = VMMD.MDs.names;
 eqPoint = VMMD.eq;
 
 %Plot VMs
-% for jj = 1:length(T_ampls)
-%     
-%     VMs = cell(nVMs,1);
-%     for ii = 1:nVMs  
-%         VMs{ii,1} = reshape(VMsCold{jj}(:,ii),5,[]).';    
-%     end
-% 
-%     for ii = 1:nVMs
-%         figure; hold on;
-%         VM2plot = VMs{ii};
-%         PlotFieldonDeformedMesh([nodes,zNodes],elements, [VM2plot(:,1),...
-%             VM2plot(:,2), VM2plot(:,3)], 'factor', 10*max(nodes(:,2)));
-%         title(['VM ',num2str(ii),' dT = ',num2str(T_ampls(jj)),'K, f: ', num2str(fcold(ii,jj)),' Hz']);
-%     end
-% 
-% end
+for jj = 1:length(T_ampls)
+    
+    VMs = cell(nVMs,1);
+    for ii = 1:nVMs  
+        VMs{ii,1} = reshape(VMsCold{jj}(:,ii),5,[]).';    
+    end
+
+    for ii = 1:nVMs
+        figure; hold on;
+        VM2plot = VMs{ii};
+        PlotFieldonDeformedMesh([nodes,zNodes],elementsPlot, [VM2plot(:,1),...
+            VM2plot(:,2), VM2plot(:,3)], 'factor', 15*max(nodes(:,2)));
+        title(['VM ',num2str(ii),' dT = ',num2str(T_ampls(jj)),'K, f: ', num2str(fcold(ii,jj)),' Hz']);
+    end
+
+end
 
 
 % %plot MDs
@@ -162,7 +166,7 @@ eqPoint = VMMD.eq;
 %     for ii = 1:nMDs
 %         figure; hold on;
 %         MD2plot = MDs{ii};
-%         PlotFieldonDeformedMesh([nodes,zNodes],elements, [MD2plot(:,1),...
+%         PlotFieldonDeformedMesh([nodes,zNodes],elementsPlot, [MD2plot(:,1),...
 %             MD2plot(:,2), MD2plot(:,3)], 'factor',max(nodes(:,2)));
 %         title(['MD ',num2str(MDsNames(ii,1)),num2str(MDsNames(ii,2)),'  dT = ',num2str(T_ampls(jj)),'K']);
 %     end
@@ -301,23 +305,74 @@ eqPoint = VMMD.eq;
 %     for ii = 1:nVMs
 %         figure; hold on;
 %         VM2plot = VMs{ii};
-%         PlotFieldonDeformedMesh([nodes,zNodes],elements, [VM2plot(:,1),...
+%         PlotFieldonDeformedMesh([nodes,zNodes],elementsPlot, [VM2plot(:,1),...
 %             VM2plot(:,2), VM2plot(:,3)], 'factor',max(nodes(:,2)));
 %         title(['VM ',num2str(ii),' dT = ',num2str(T_ampls(jj)),'K, f: ', num2str(fhot(ii,jj)),' Hz']);
 %     end
 % 
 % end
 
-%% Compute Hot modes and Modal Derivatives
 
-T_ampls = [5,10,15];
+%% Define dynamic temperature variation
+
+%define the shape of T distribution
+
+%1)constant T
+% Tshape = 1*ones(myMesh.nNodes,1);
+
+%2)Gaussian temperature
+%independent parameters of T distribution
+sigma3X = Lx/2;
+sigma3Y = Ly/2;
+
+theta = 0; %inclination w.r.t. x axis
+xc = Lx/3; %center of pulse
+yc = Ly/3; %center of pulse
+
+%dependent parameteres
+sigmaX = sigma3X/3;
+sigmaY = sigma3Y/3;
+
+a = cos(theta)^2/(2*sigmaX^2) + sin(theta)^2/(2*sigmaY^2);
+b = - sin(2*theta)/(4*sigmaX^2) + sin(2*theta)/(4*sigmaY^2);
+c = sin(theta)^2/(2*sigmaX^2) + cos(theta)^2/(2*sigmaY^2);
+
+nodesX = nodes(:,1);
+nodesY = nodes(:,2);
+
+Tshape = exp( -( a*(nodesX-xc).^2 +2*b*(nodesX-xc).*(nodesY-yc) +c*(nodesY-yc).^2) ); %gaussian with center at xc,yc inclined of angle theta w.r.t. x axis
+
+
+%plot Tshape
+figure
+hf = PlotFieldonMesh(nodes,elementsPlot,Tshape);
+title('Temperature distribution shape')
+
+Tinitial = 0;
+Tfinal = 70;
+eps = 0.1; 
+timeRamp = 1/fcold(1)/eps;
+
+tstartRamp = timeRamp;
+%Adynt = @(t) (Tfinal - Tinitial)/timeRamp*t + (Tfinal - (Tfinal - Tinitial)/timeRamp*t).*heaviside(t-timeRamp);
+Adynt = @(t) (Tfinal - Tinitial)/timeRamp*t + (Tfinal - (Tfinal - Tinitial)/timeRamp*t).*heaviside(t-timeRamp) + ...
+         -heaviside(-t).*(Tfinal - Tinitial)/timeRamp.*t;
+Adynt = @(t) Adynt(t-tstartRamp);
+
+Tdynt = @(t) Tshape*(Adynt(t)).';
+%Tdynt = @(t) (Tshape*(Tfinal - Tinitial)/timeRamp*(t-tstartRamp) + (Tshape*Tfinal - Tshape*(Tfinal - Tinitial)/timeRamp*(t-tstartRamp))*heaviside((t-tstartRamp)-timeRamp));
+
+gradTt = @(t) zeros(myMesh.nNodes,1);
+
+%% Compute Hot modes and Modal Derivatives
+T_ampls = 70;
 
 n_sampl = length(T_ampls);
 T_samples = zeros(myMesh.nNodes,n_sampl);
 gradT_samples = zeros(myMesh.nNodes,n_sampl);
 
 for ii = 1:n_sampl
-    T_samples(:,ii) = ones(myMesh.nNodes,1)*T_ampls(ii);
+    T_samples(:,ii) = Tshape*T_ampls(ii);
 end
 
 nVMs = 5;
@@ -330,32 +385,33 @@ MDsHot = VMMD.MDs.data;
 MDsNames = VMMD.MDs.names;
 eqPoint = VMMD.eq;
 
-% %Plot equilibrium configuration
-% for jj = 1:length(T_ampls)
-%     eqPoint = reshape(eqPoint,5,[]).';
-%     figure
-%     PlotFieldonDeformedMesh([nodes,zNodes],elements, [eqPoint(:,1),...
-%             eqPoint(:,2), eqPoint(:,3)], 'factor',5*max(nodes(:,2)));
-%         title(['equilibrium position for uniform dT = ',num2str(T_ampls(jj)),'K']);
-% end
-% 
-% %Plot VMs
-% for jj = 1:length(T_ampls)
-%     
-%     VMs = cell(nVMs,1);
-%     for ii = 1:nVMs  
-%         VMs{ii,1} = reshape(VMsHot{jj}(:,ii),5,[]).';    
-%     end
-% 
-%     for ii = 1:nVMs
-%         figure; hold on;
-%         VM2plot = VMs{ii};
-%         PlotFieldonDeformedMesh([nodes,zNodes],elements, [VM2plot(:,1),...
-%             VM2plot(:,2), VM2plot(:,3)], 'factor',5*max(nodes(:,2)));
-%         title(['VM ',num2str(ii),' dT = ',num2str(T_ampls(jj)),'K, f: ', num2str(fhot(ii,jj)),' Hz']);
-%     end
-% 
-% end
+%Plot equilibrium configuration
+for jj = 1:length(T_ampls)
+    eqPoint = reshape(eqPoint,5,[]).';
+    figure
+    PlotFieldonDeformedMesh([nodes,zNodes],elementsPlot, [eqPoint(:,1),...
+            eqPoint(:,2), eqPoint(:,3)], 'factor',120*max(nodes(:,2)));
+        %title(['equilibrium position for uniform dT = ',num2str(T_ampls(jj)),'K']);
+end
+
+%Plot VMs
+for jj = 1:length(T_ampls)
+    
+    VMs = cell(nVMs,1);
+    for ii = 1:nVMs  
+        VMs{ii,1} = reshape(VMsHot{jj}(:,ii),5,[]).';    
+    end
+
+    for ii = 1:nVMs
+        figure; hold on;
+        VM2plot = VMs{ii};
+        PlotFieldonDeformedMesh([nodes,zNodes],elementsPlot, [VM2plot(:,1),...
+            VM2plot(:,2), VM2plot(:,3)], 'factor',15*max(nodes(:,2)));
+        title(['VM ',num2str(ii),' dT = ',num2str(T_ampls(jj)),'K, f: ', num2str(fhot(ii,jj)),' Hz']);
+        colorbar off
+    end
+
+end
 % 
 % 
 % %plot MDs
@@ -371,26 +427,12 @@ eqPoint = VMMD.eq;
 %     for ii = 1:nMDs
 %         figure; hold on;
 %         MD2plot = MDs{ii};
-%         PlotFieldonDeformedMesh([nodes,zNodes],elements, [MD2plot(:,1),...
+%         PlotFieldonDeformedMesh([nodes,zNodes],elementsPlot, [MD2plot(:,1),...
 %             MD2plot(:,2), MD2plot(:,3)], 'factor',0.1*max(nodes(:,2)));
 %         title(['MD ',num2str(MDsNames(ii,1)),num2str(MDsNames(ii,2)),'  dT = ',num2str(T_ampls(jj)),'K']);
 %     end
 % 
 % end
-
-
-
-%% Define dynamic temperature variation
-
-T0 = 1*ones(myMesh.nNodes,1);
-Tinitial = 0;
-Tfinal = 0;
-eps = 0.1; 
-timeRamp = 1/fcold(1)/eps;
-
-Tdynt = @(t) T0*(Tfinal - Tinitial)/timeRamp*t + (T0*Tfinal - T0*(Tfinal - Tinitial)/timeRamp*t)*heaviside(t-timeRamp);
-gradTt = @(t) zeros(myMesh.nNodes,1);
-
 %% Define forcing
 % F0 = zeros(myMesh.nDOFs,1);
 
@@ -402,19 +444,44 @@ gradTt = @(t) zeros(myMesh.nNodes,1);
 nodesX = nodes(:,1);
 Fmax = 5000/length(nodes);
 Fmin = 0;
-Fz = nodesX*Fmax/Lx;
+Fz = Fmax-nodesX*Fmax/Lx;
 F0 = zeros(myMesh.nDOFs,1);
 F0(3:5:end) = Fz;
 
-fForc = 207;% tra la terza e quarta fredde, tra la prima e la seconda calda(fcold(1)+fcold(2))/2;
+%plot forcing shape
+figure
+hf = PlotFieldonMesh(nodes,elementsPlot,Fz);
+title('Forcing distribution shape (out of plane)')
+
+fForc = 160; %tra la seconda e la terza calde, tra la prima e la seconda fredde
 omForc = 2*pi*fForc;
 TForc = 1/fForc;
 
 Fext = @(t) F0*cos(omForc*t);
 
 %% Define integration time
-tint = timeRamp/2;
+tint = 3.5*timeRamp;
 
+%% Plot dynamic T over the analysis
+tPlot = linspace(0,tint,100);
+figure
+for ii = 1:length(tPlot)
+    tii = tPlot(ii);
+    hf = PlotFieldonMesh(nodes,elementsPlot,Tdynt(tii));
+    title('Temperature distribution in time')
+    clim([0, Tfinal]); 
+    txt = text('Units', 'Normalized', 'Position', [0.5, 0.9], 'string',...
+    ['t: ',num2str(round(tii,5)),'s'], 'fontsize', 12); drawnow limitrate
+    delete(txt)
+end
+txt = text('Units', 'Normalized', 'Position', [0.4, 0.9], 'string',...
+    ['t: ',num2str(round(tii,5)),'s'], 'fontsize', 12);
+
+tt = linspace(0,tint,1000);
+figure
+plot(tt,Adynt(tt),'-k','linewidth',2)
+xlabel('time [s]')
+ylabel('T_{max} [K]')
 %% Integrate full model
 % settings for integration
 h = 2*pi/omForc/25; % time step for integration
@@ -478,7 +545,7 @@ uDynFullLin = Assembly.unconstrain_vector(uDynFullLin);
 dynFull.lin.disp = decodeDofsNodes(uDynFullLin,nNodes,5); % (node, dof of node, tsamp)
 dynFull.lin.time = TI_LIN.Solution.time;
 
-plot_dof_location = [0.5,0.5]; %percentage of length of beam
+plot_dof_location = [0.3,0.3]; %percentage of length of beam
 node2plot = find_node(plot_dof_location(1)*Lx,plot_dof_location(2)*Ly,[],nodes); % node to plot
 
 figure
@@ -492,7 +559,7 @@ legend('NL','LIN')
 [~,uStaticF] = static_eq_shell_thermal(Assembly, F0, zeros(myMesh.nNodes,1), zeros(myMesh.nNodes,1), 'display', 'iter-detailed');
 
 %compute the static solution (to temperature)
-argTanStiff = {Tfinal*ones(myMesh.nNodes,1), zeros(myMesh.nNodes,1)};
+argTanStiff = {Tfinal*Tshape, zeros(myMesh.nNodes,1)};
 [~,Fth] = Assembly.tangent_stiffness_and_force(0*F0,argTanStiff{:});
 Assembly.DATA.K = Assembly.DATA.Kc; %cold T used to predict the response with linear analysis
 Assembly.DATA.F0 = Fth;
@@ -507,17 +574,19 @@ Assembly.DATA.F0 = Fth;
 
 %Vcold = orth([VMsCold{1,1},MDsCold{1,1},uStaticF,uStaticT]);%,uStaticT]);%,uStaticTF]); %reduction basis (cold basis)
 Vcold = orth([VMsCold{1,1},MDsCold{1,1}]);
-Vcold = orth([VMsCold{1,1},MDsCold{1,1},uStaticF]);
+Vcold = orth([VMsCold{1,1},MDsCold{1,1},uStaticF,uStaticT,uStaticTF]);
+Vhot = orth([VMsHot{1,1},MDsHot{1,1},uStaticF,uStaticT,uStaticTF]);
 %Vcold = orth([VMsCold{1,1}]);
 
 V = Vcold;
+%V = Vhot;
 
 redAssembly = ReducedAssembly(myMesh,V); %reduced assembly
 redAssembly.DATA.M = V.'*Assembly.DATA.M*V;
 redAssembly.DATA.C = V.'*Assembly.DATA.C*V;
 
-Tred = zeros(nNodes,1);
-gradTred = zeros(nNodes,1);
+% Tred = zeros(nNodes,1);
+% gradTred = zeros(nNodes,1);
 %[Ktgred,Fred] = RedAssembly.tangent_stiffness_and_force(zeros(size(Vcold,2),1),Tred,gradTred);
 
 %% Integrate nonlinear ROM (constant basis)
@@ -567,14 +636,24 @@ ROMtime = dynRed.nlin.time;
 errRes = residual_error_ROM(residualFull,ROMdisp,ROMvel,ROMacc,ROMtime);
 
 %% plot comparison
-plotDofLocation = [0.5,0.5]; %percentage of plate length (along x and y)
+plotDofLocation = [0.3,0.3]; %percentage of plate length (along x and y)
 node2plot = find_node(plotDofLocation(1)*Lx,plotDofLocation(2)*Ly,[],nodes); % node to plot
-dofPl = 1;
+dofPl = 3;
 
-description = 'reduction basis: first 10 VMs, nDofRed = 10 ';
-
+description = 'reduction basis: first 5 cold VMs and MDs + static T + static TF, nDofRed = 22 ';
 fontsize = 15;
 linewidth = 2;
+
+figure('units','normalized','position',[0.3,0.1,0.6,0.7]); hold on
+plot(dynFull.nlin.time,squeeze(dynFull.nlin.disp(node2plot,dofPl,:)),'-k','linewidth',linewidth)
+plot(dynRed.nlin.time,squeeze(dynRed.nlin.disp(node2plot,dofPl,:)),'--r','linewidth',linewidth)
+plot(dynFull.lin.time,squeeze(dynFull.lin.disp(node2plot,dofPl,:)),'--b','linewidth',linewidth)
+xlabel('time [s]','fontsize',fontsize); ylabel('u [m]','fontsize', fontsize)
+title(['normalized plotted dof location: ',num2str(plotDofLocation(1)),',',...
+    num2str(plotDofLocation(2)),',  dof: ',num2str(dofPl)]);
+ax = gca; grid on; ax.FontSize = fontsize; legend('HFM','RED','LIN','fontsize',fontsize);
+
+
 figure('units','normalized','position',[0.3,0.1,0.6,0.7]); 
 subplot 311; hold on
 plot(dynFull.nlin.time,squeeze(dynFull.nlin.disp(node2plot,dofPl,:)),'-k','linewidth',linewidth)
@@ -617,7 +696,6 @@ title('normalized RMS membrane error');
 xlabel('time [s]','fontsize', fontsize);
 ylabel('error % ', 'fontsize', fontsize);
 ax = gca; grid on; ax.FontSize = fontsize;
-
 subplot 313
 hold on
 semilogy(dynFull.nlin.time,100*errROMrotation,'-k','linewidth',linewidth)

@@ -81,7 +81,7 @@ classdef ContinuumThermalElement < Element
                      th(2) th(1) 0     th(5) th(4) 0     th(8) th(7) 0;
                      th(3)     0 th(1) th(6) 0     th(4) th(9) 0     th(7);
                      0     th(3) th(2) 0     th(6) th(5) 0     th(9) th(8)];
-                % Sfun: (s)  tensor -> voigt (S)
+                % Sfun: (s)  voigt -> tensor (S)
              	self.initialization.Sfun = @(s) [s(1) s(4) s(5); 
                                                  s(4) s(2) s(6); 
                                                  s(5) s(6) s(3)];
@@ -91,6 +91,14 @@ classdef ContinuumThermalElement < Element
                 % thermal expansion vector
                 alpha = self.Material.THERMAL_EXPANSION_COEFFICIENT;
                 self.initialization.alphaVec = alpha*[1,1,1,0,0,0].';
+
+                %from ten to voigt fun
+                self.initialization.STenVoigtFun = @(S) [S(1,1),S(2,2),...
+                                          S(3,3),S(1,2),S(1,3),S(2,3)]'; %6X1
+
+                %dxdX
+                self.initialization.Ffun = @(th) (reshape(th,3,3))'+ eye(3);
+
             end
             self.initialization.K = zeros(ne); 	 % stiffness-element matrix
             self.initialization.F = zeros(ne,1); % element internal forces
@@ -224,6 +232,48 @@ classdef ContinuumThermalElement < Element
                 F(3:3:end) = self.vol/self.nNodes; % uniformly distributed pressure on the structure
             end
         end
+
+        function cauchyField = cauchy_stress(self,nodeIDsQueried,x,T)
+
+            [displ,Te] = self.extract_element_data(x,T);
+            X = self.quadrature.X;
+            C = self.initialization.C;
+            H = self.initialization.H;
+            alphaVec = self.initialization.alphaVec;
+            Afun = self.initialization.Afun; % fun: (th) vector -> matrix (A)
+            Sfun = self.initialization.Sfun; % fun: (s)  voigt -> tensor (S)
+            STenVoigtFun = self.initialization.STenVoigtFun; % SCauchy (tensor) -> SCauchy (voigt)
+            Ffun = self.initialization.Ffun; %dxdX
+
+            NintPoints = size(X,2);
+            cauchyAtGauss = zeros(6,NintPoints); %voigt stress
+
+            for ii = 1:NintPoints
+                Xi = X(:,ii);   % quadrature points
+                N = self.shape_functions(Xi); %shape function (for T)
+                Tii = N.'*Te; %temperature
+                [G,detJ,dH] = shape_function_derivatives(self, Xi);
+                th  = G*displ;
+                A = Afun(th);
+                % Green Strain tensor
+                E = (H + 1/2*A)*th;
+                % second Piola-Kirchhoff stress tensor
+                s = C*(E - alphaVec*Tii);   % stress vector (voigt)
+                S = Sfun(s);    % stress tensor
+                F = Ffun(th);
+                J = det(F);
+                SCauchy = 1/J*F*S*F'; %cauchy stress
+                cauchyAtGauss(:,ii) = STenVoigtFun(SCauchy);
+            end
+
+            %extrapolate value of field from gauss points to nodes
+            gauss2NodesMatrix = self.gauss_to_nodes();
+            gauss2QueriedNodesMatrix = gauss2NodesMatrix(ismember(self.nodeIDs,nodeIDsQueried),:);
+            cauchyField = gauss2QueriedNodesMatrix*cauchyAtGauss';
+
+        end
+
+
         
         % ADVANCED FUNCTIONS ______________________________________________
         

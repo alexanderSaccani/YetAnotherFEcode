@@ -39,7 +39,8 @@ ROMsamples = (interp1(ROMtime',ROMsamples',HFMtime'))';
 error = HFMsamples - ROMsamples;
 sqrdErr = error.^2;
 
-err = sqrt(sum(sqrdErr,1))/(size(error,1));
+meanDisp = sum(abs(HFMsamples),1)/size(HFMsamples,1);
+err = sqrt(sum(sqrdErr,1))/(size(error,1))./meanDisp;
 
 end
 

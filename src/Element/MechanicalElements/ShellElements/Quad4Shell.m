@@ -96,31 +96,6 @@ classdef Quad4Shell < ShallowShellElement
             
         end
         
-%         %compute the derivatives from nodal displacements and shape
-%         %functions_________________________________________________________
-%         function out = dUdx(obj,X,p)
-%             %X -> vector of natural coordinates
-%             %p -> vector of nodal displacements (in the local ref. frame)
-%             
-%             [~,~,dNdx] = shape_function_derivatives(obj,X);
-%             dudx = (dNdx * (obj.initialization.EMu())*p)';
-%             dvdx = (dNdx * (obj.initialization.EMv())*p)';
-%             
-%             out.dUdx = [dudx, dvdx]'; %in plane disp (dudx;dudy;dvdx;dvdy)
-%             
-%             out.dwdx = (dNdx * (obj.initialization.EMw())*p); %out of plane disp (dwdx;dwdy)
-%             
-%             dthxdx = (dNdx * (obj.initialization.EMthx())*p)';
-%             dthydx = (dNdx * (obj.initialization.EMthy())*p)';
-%             
-%             out.dthdx = [dthxdx, dthydx]'; %theta (dthxdx;dthxdy;dthydx;dthydy)
-%             
-%             out.dzdx = dNdx * obj.z; %z coordinates (dzdx;dzdy)
-%                 
-%                        
-%         end
-              
-        
         
         %initialize extraction matrices
         function initialize_extraction_matrices(obj)
@@ -164,9 +139,25 @@ classdef Quad4Shell < ShallowShellElement
             
         end
 
+        %gauss to nodes matrices
+        function out = gauss_to_nodes(obj)
+            
+            if (obj.quadrature.Ng == 2)
+                
+      out = [0.1340   -0.5000   -0.5000    1.8660;
+            -0.5000    1.8660    0.1340   -0.5000;
+            1.8660   -0.5000   -0.5000     0.1340;
+            -0.5000    0.1340    1.8660   -0.5000];
+
+            else
+                error('method to extract field at nodes from field at gauss points not specified for Ng > 2')
+            end
+
+        end
+             
+
         
-    end
-    
+    end    
 
        
     methods (Static)
@@ -182,15 +173,10 @@ classdef Quad4Shell < ShallowShellElement
                       +(xi + 1)*(eta + 1); 
                       -(xi - 1)*(eta + 1)].';            
                   
-        end
-                     
+        end        
                   
         end
-        
-         
-
-        
-             
+            
         
 end
     
