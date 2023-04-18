@@ -384,7 +384,7 @@ eqPoint = VMMD.eq;
 
 T0 = 1*ones(myMesh.nNodes,1);
 Tinitial = 0;
-Tfinal = 0;
+Tfinal = 20;
 eps = 0.1; 
 timeRamp = 1/fcold(1)/eps;
 
@@ -413,7 +413,7 @@ TForc = 1/fForc;
 Fext = @(t) F0*cos(omForc*t);
 
 %% Define integration time
-tint = timeRamp/2;
+tint = timeRamp;
 
 %% Integrate full model
 % settings for integration
@@ -450,6 +450,26 @@ dynFull.nlin.time = TI_NL.Solution.time;
 % figure
 % plot(dynFull.nlin.time,squeeze(dynFull.nlin.disp(node2plot,3,:)))
 
+%extract internal bending action at given node
+stressNodeLocation = [0.5*Lx,0.5*Ly];
+nodeSetMoment = find_node(stressNodeLocation(1),stressNodeLocation(2),[],nodes);
+
+method = 'bending_moments';
+nOut = 3;
+
+timeSamplsInt = dynFull.nlin.time;
+nTimeSamplesInt = length(timeSamplsInt);
+TSamplsInt = zeros(myMesh.nNodes,nTimeSamplesInt);
+gradTSamplsInt = zeros(myMesh.nNodes,nTimeSamplesInt);
+for ii = 1:nTimeSamplesInt
+    TSamplsInt(:,ii) = Tdynt(timeSamplsInt(ii));
+    gradTSamplsInt(:,ii) =gradTt(timeSamplsInt(ii));
+end
+
+bendingMomentFull = Assembly.get_field(elements,nodeSetMoment,method,nOut,uDynFull,TSamplsInt,gradTSamplsInt);
+
+% figure
+% plot(timeSamplsInt,squeeze(bendingMoment(1,2,:)))
 %% integrate linearized model
 % settings for integration
 h = 2*pi/omForc/25; % time step for integration
@@ -505,9 +525,9 @@ Assembly.DATA.F0 = Fth;
 
 % UNL = reshape(u,5,[]).';        % Nonlinear response
 
-%Vcold = orth([VMsCold{1,1},MDsCold{1,1},uStaticF,uStaticT]);%,uStaticT]);%,uStaticTF]); %reduction basis (cold basis)
-Vcold = orth([VMsCold{1,1},MDsCold{1,1}]);
-Vcold = orth([VMsCold{1,1},MDsCold{1,1},uStaticF]);
+Vcold = orth([VMsCold{1,1},MDsCold{1,1},uStaticF,uStaticT]);%,uStaticT]);%,uStaticTF]); %reduction basis (cold basis)
+%Vcold = orth([VMsCold{1,1},MDsCold{1,1}]);
+%Vcold = orth([VMsCold{1,1},MDsCold{1,1},uStaticF]);
 %Vcold = orth([VMsCold{1,1}]);
 
 V = Vcold;
@@ -548,6 +568,18 @@ aDynRed = V*TI_NL_r.Solution.qdd;
 %save solution
 dynRed.nlin.disp = decodeDofsNodes(uDynRed,nNodes,nDofPerNode); % (node, dof of node, tsamp)
 dynRed.nlin.time = TI_NL_r.Solution.time;
+
+%extract force field
+timeSamplsInt = dynRed.nlin.time;
+nTimeSamplesInt = length(timeSamplsInt);
+TSamplsInt = zeros(myMesh.nNodes,nTimeSamplesInt);
+gradTSamplsInt = zeros(myMesh.nNodes,nTimeSamplesInt);
+for ii = 1:nTimeSamplesInt
+    TSamplsInt(:,ii) = Tdynt(timeSamplsInt(ii));
+    gradTSamplsInt(:,ii) =gradTt(timeSamplsInt(ii));
+end
+
+bendingMomentRed = Assembly.get_field(elements,nodeSetMoment,method,nOut,uDyn,TSamplsInt,gradTSamplsInt);
 
 %% compute error
 nodesErr = 1:1:size(nodes,1);

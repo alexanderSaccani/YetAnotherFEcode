@@ -635,7 +635,8 @@ ROMacc = Assembly.constrain_vector(aDynRed);
 ROMtime = dynRed.nlin.time;
 errRes = residual_error_ROM(residualFull,ROMdisp,ROMvel,ROMacc,ROMtime);
 
-%% plot comparison
+%% plot comparison (displacements)
+%displacements
 plotDofLocation = [0.3,0.3]; %percentage of plate length (along x and y)
 node2plot = find_node(plotDofLocation(1)*Lx,plotDofLocation(2)*Ly,[],nodes); % node to plot
 dofPl = 3;
@@ -705,6 +706,104 @@ ylabel('error % ', 'fontsize', fontsize);
 ax = gca; grid on; ax.FontSize = fontsize;
 
 
+%% bending moment history
+%extract internal bending action at given node
+stressNodeLocation = [0.3,0.2];
+nodeSetMoment = find_node(stressNodeLocation(1)*Lx,stressNodeLocation(2)*Ly,[],nodes);
 
+method = 'bending_moments';
+nOut = 3;
+
+%extract bending moment field from Full Solution
+timeSamplsInt = dynFull.nlin.time;
+nTimeSamplesInt = length(timeSamplsInt);
+TSamplsInt = zeros(myMesh.nNodes,nTimeSamplesInt);
+gradTSamplsInt = zeros(myMesh.nNodes,nTimeSamplesInt);
+for ii = 1:nTimeSamplesInt
+    TSamplsInt(:,ii) = Tdynt(timeSamplsInt(ii));
+    gradTSamplsInt(:,ii) = gradTt(timeSamplsInt(ii));
+end
+
+bendingMomentFull = Assembly.get_field(elements,nodeSetMoment,method,nOut,uDynFull,TSamplsInt,gradTSamplsInt);
+
+%extract bending moment field from Red Solution
+timeSamplsInt = dynRed.nlin.time;
+nTimeSamplesInt = length(timeSamplsInt);
+TSamplsInt = zeros(myMesh.nNodes,nTimeSamplesInt);
+gradTSamplsInt = zeros(myMesh.nNodes,nTimeSamplesInt);
+for ii = 1:nTimeSamplesInt
+    TSamplsInt(:,ii) = Tdynt(timeSamplsInt(ii));
+    gradTSamplsInt(:,ii) = gradTt(timeSamplsInt(ii));
+end
+
+bendingMomentRed = Assembly.get_field(elements,nodeSetMoment,method,nOut,uDynRed,TSamplsInt,gradTSamplsInt);
+
+%% plot comparison (bending moment)
+
+figure('units','normalized','position',[0.3,0.1,0.6,0.7]); hold on
+plot(dynFull.nlin.time,squeeze(bendingMomentFull(1,1,:)),'-k','linewidth',linewidth)
+plot(dynRed.nlin.time,squeeze(bendingMomentRed(1,1,:)),'--r','linewidth',linewidth)
+xlabel('time [s]','fontsize',fontsize); ylabel('M/l [N]','fontsize', fontsize)
+title(['M_x, normalized plotted dof location: ',num2str(stressNodeLocation(1)),',',...
+    num2str(stressNodeLocation(2))]);
+ax = gca; grid on; ax.FontSize = fontsize; legend('HFM','RED','fontsize',fontsize);
+
+%% Compute error on bending moments
+method = 'bending_moments';
+nodeSetMoment = 'all'; %compute error on bending moment over all the nodes
+nOut = 3;
+
+%extract bending moment field from Full Solution
+timeSamplsInt = dynFull.nlin.time;
+nTimeSamplesInt = length(timeSamplsInt);
+TSamplsInt = zeros(myMesh.nNodes,nTimeSamplesInt);
+gradTSamplsInt = zeros(myMesh.nNodes,nTimeSamplesInt);
+for ii = 1:nTimeSamplesInt
+    TSamplsInt(:,ii) = Tdynt(timeSamplsInt(ii));
+    gradTSamplsInt(:,ii) = gradTt(timeSamplsInt(ii));
+end
+
+bendingMomentFull = Assembly.get_field(elements,nodeSetMoment,method,nOut,uDynFull,TSamplsInt,gradTSamplsInt);
+
+%extract bending moment field from Red Solution
+timeSamplsInt = dynRed.nlin.time;
+nTimeSamplesInt = length(timeSamplsInt);
+TSamplsInt = zeros(myMesh.nNodes,nTimeSamplesInt);
+gradTSamplsInt = zeros(myMesh.nNodes,nTimeSamplesInt);
+for ii = 1:nTimeSamplesInt
+    TSamplsInt(:,ii) = Tdynt(timeSamplsInt(ii));
+    gradTSamplsInt(:,ii) = gradTt(timeSamplsInt(ii));
+end
+
+bendingMomentRed = Assembly.get_field(elements,nodeSetMoment,method,nOut,uDynRed,TSamplsInt,gradTSamplsInt);
+
+errMomentX = RMS_error(squeeze(bendingMomentFull(:,1,:)),dynFull.nlin.time,...
+    squeeze(bendingMomentRed(:,1,:)),dynRed.nlin.time);
+errMomentY = RMS_error(squeeze(bendingMomentFull(:,2,:)),dynFull.nlin.time,...
+    squeeze(bendingMomentRed(:,2,:)),dynRed.nlin.time);
+
+%plot error
+fontsize = 15;
+linewidth = 2;
+
+figure('units','normalized','position',[0.3,0.1,0.6,0.7]); hold on
+subplot 311
+semilogy(dynFull.nlin.time,100*errMomentX ,'-k','linewidth',linewidth)
+title('normalized RMS error on Moment Mx');
+xlabel('time [s]','fontsize', fontsize);
+ylabel('error % ', 'fontsize', fontsize);
+ax = gca; grid on; ax.FontSize = fontsize;
+
+subplot 312
+semilogy(dynFull.nlin.time,100*errMomentY ,'-k','linewidth',linewidth)
+title('normalized RMS error on Moment My');
+xlabel('time [s]','fontsize', fontsize);
+ylabel('error % ', 'fontsize', fontsize);
+ax = gca; grid on; ax.FontSize = fontsize;
+
+subplot 313
+plot(dynFull.nlin.time,squeeze(bendingMomentFull(:,1,:)),'-k');
+hold on
+plot(dynRed.nlin.time,squeeze(bendingMomentRed(:,1,:)),'--r');
 
 

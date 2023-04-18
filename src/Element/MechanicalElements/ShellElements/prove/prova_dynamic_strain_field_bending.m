@@ -110,6 +110,18 @@ uDynFull = TI_NL.Solution.q;
 %save solution
 uDynFull = Assembly.unconstrain_vector(uDynFull); 
 
+%% evaluate field
+timeInt = TI_NL.Solution.time;
+nTimeSamplesInt = length(timeInt);
+
+Tsampls = ones(myMesh.nNodes,nTimeSamplesInt);
+gradTSampls = Tsampls;
+
+method = 'bending_moments';
+nodeSet = [1,2,33,11];
+nOut = 3;
+field = Assembly.get_field(elements,nodeSet,method,nOut,uDynFull,Tsampls,gradTSampls);
+
 
 return
 %% Static analysis 
