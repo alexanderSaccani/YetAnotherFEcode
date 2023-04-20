@@ -39,8 +39,11 @@ ROMsamples = (interp1(ROMtime',ROMsamples',HFMtime'))';
 error = HFMsamples - ROMsamples;
 sqrdErr = error.^2;
 
-meanDisp = sum(abs(HFMsamples),1)/size(HFMsamples,1);
+%meanDisp = sum(abs(HFMsamples),1)/size(HFMsamples,1);
+meanDisp = sum((max(HFMsamples,[],2) - min(HFMsamples,[],2)),1)/(nNodes*nGdl); %take into account time history of displacements to compute the normalization factor
 err = sqrt(sum(sqrdErr,1))/(size(error,1))./meanDisp;
+
+
 
 end
 

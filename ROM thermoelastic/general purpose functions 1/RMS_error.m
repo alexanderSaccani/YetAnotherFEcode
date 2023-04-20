@@ -18,7 +18,8 @@ ROMsol = (interp1(ROMtime',ROMsol',HFMtime'))';
 error = HFMsol - ROMsol;
 sqrdErr = error.^2;
 
-meanSol = sum(abs(HFMsol),1)/size(HFMsol,1); %normalized with respect to mean solution
+%meanSol = sum(abs(HFMsol),1)/size(HFMsol,1); %normalized with respect to mean solution
+meanSol = sum(( max(HFMsol,[],2) - min(HFMsol,[],2)),1)/(size(HFMsol,1)); %take into account the whole time history for normalization
 err = sqrt(sum(sqrdErr,1))/(size(error,1))./meanSol;
 
 end

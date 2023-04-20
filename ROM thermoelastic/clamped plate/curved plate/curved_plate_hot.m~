@@ -575,13 +575,12 @@ Assembly.DATA.F0 = Fth;
 
 %Vcold = orth([VMsCold{1,1},MDsCold{1,1},uStaticF,uStaticT]);%,uStaticT]);%,uStaticTF]); %reduction basis (cold basis)
 %Vcold = orth([VMsCold{1,1},MDsCold{1,1}]);
-Vcold = orth([VMsCold{1,1},MDsCold{1,1},uStaticF1,uStaticF2,uStaticT]);
-Vhot = orth([VMsHot{1,1},MDsHot{1,1}]);%,uStaticF,uStaticT,uStaticTF]);
+Vcold = orth([VMsCold{1,1},MDsCold{1,1},uStaticF1,uStaticF2,uStaticT,uStaticTF]);
+%Vhot = orth([VMsHot{1,1},MDsHot{1,1},uStaticF,uStaticT,uStaticTF]);
 %Vcold = orth([VMsCold{1,1}]);
 
-%V = Vcold;
 V = Vhot;
-V = orth([Vcold,Vhot]);
+%V = Vhot;
 
 redAssembly = ReducedAssembly(myMesh,V); %reduced assembly
 redAssembly.DATA.M = V.'*Assembly.DATA.M*V;
@@ -641,7 +640,7 @@ errRes = residual_error_ROM(residualFull,ROMdisp,ROMvel,ROMacc,ROMtime);
 %displacements
 plotDofLocation = [0.3,0.5]; %percentage of plate length (along x and y)
 node2plot = find_node(plotDofLocation(1)*Lx,plotDofLocation(2)*Ly,[],nodes); % node to plot
-dofPl = 4;
+dofPl = 3;
 
 description = 'reduction basis: first 5 cold VMs and MDs + static T + static TF, nDofRed = 22 ';
 fontsize = 15;
@@ -721,7 +720,7 @@ ax = gca; grid on; ax.FontSize = fontsize;
 
 %% bending moment history
 %extract internal bending action at given node
-stressNodeLocation = [0.3,0.5];
+stressNodeLocation = [0.3,0.2];
 nodeSetMoment = find_node(stressNodeLocation(1)*Lx,stressNodeLocation(2)*Ly,[],nodes);
 
 method = 'bending_moments';
