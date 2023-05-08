@@ -4,7 +4,11 @@ function [ u_lin, u ] = static_equilibrium( Assembly, Fext, varargin )
 [nsteps,tol,method,displayoption,vararginTanStiffForce] = parse_inputs(varargin{:});
 
 K = Assembly.DATA.K;
-F0 = Assembly.DATA.F0;
+if isfield(Assembly.DATA,'F0')
+    F0 = Assembly.DATA.F0;
+else
+    F0 = zeros(Assembly.Mesh.nDOFs,1);
+end
 
 u_lin = Assembly.solve_system(K,Fext,F0); % in the linearized model, the internal forces are Kx + F0
 u0 = Assembly.constrain_vector(u_lin);

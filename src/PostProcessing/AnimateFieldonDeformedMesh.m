@@ -20,6 +20,7 @@ nnodes = size(Nodes,1);
 myVideo = VideoWriter([filename '.avi']);
 myVideo.FrameRate = framerate;
 
+
 if iscell(S)
     ns = length(S);
     s = zeros(ns,1);
@@ -36,6 +37,7 @@ if iscell(S)
     end
 else
     nt = size(S,2);
+    %S = mat2cell(S,size(S,1),ones(1,nt));
     S = {S};
     ns = 1;
 end
@@ -51,7 +53,7 @@ for j = 1:nt
         Solution = S{k};
         meshcolor = color(k,:);
         U = reshape(Solution(:,j),nDOFperNode,[]).';
-        disp = U(:,index);
+        disp = U(:,:); %gaurda
         PlotFieldonDeformedMesh(Nodes,Elements,disp,'factor',scalefactor,'color', meshcolor) ;
         if j*k == 1
             %             set(gca, 'nextplot', 'replacechildren')

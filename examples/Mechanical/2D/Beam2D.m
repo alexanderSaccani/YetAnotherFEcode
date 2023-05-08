@@ -95,7 +95,7 @@ end
 V0 = BeamAssembly.unconstrain_vector(V0);
 
 % PLOT
-mod = 2;
+mod = 1;
 elementPlot = elements(:,1:4); % plot only corners (otherwise it's a mess)
 figure('units','normalized','position',[.2 .1 .6 .8])
 PlotMesh(nodes, elementPlot, 0);

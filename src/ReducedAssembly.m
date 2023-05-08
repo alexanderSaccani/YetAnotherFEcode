@@ -35,7 +35,7 @@ classdef ReducedAssembly < Assembly
             domainElements = ~[self.Mesh.Elements(elementSet).isBoundary];
             
             Elements = self.Mesh.Elements;
-            parfor j = elementSet(domainElements)
+            for j = elementSet(domainElements)
                 thisElement = Elements(j).Object;
                 index = thisElement.iDOFs;          
                 Ve = V(index,:);
@@ -67,7 +67,7 @@ classdef ReducedAssembly < Assembly
             elementSet = find(elementWeights);
             
             % Computing element level contributions
-            parfor j = elementSet
+            for j = elementSet
                 thisElement = Elements(j).Object;
                 index = thisElement.iDOFs;          
                 Ve = V(index,:);

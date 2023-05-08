@@ -101,11 +101,11 @@ classdef ShallowShellElement < Element
         end
             
      
-        function [K,F] = tangent_stiffness_and_force(obj,p,T,gradT)
+        function [K,F] = tangent_stiffness_and_force(obj,p)
             
             %extract nodal displacements and nodal temeperatures from full
             %vector
-            [pe,Te,gradTe] = obj.extract_element_data(p,T,gradT);
+            [pe] = obj.extract_element_data(p);
             
             %get the specifications for element integration
             X = obj.quadrature.X; %get quadrature points (natural coordinates)
@@ -148,16 +148,10 @@ classdef ShallowShellElement < Element
                Bgamma = thxy + G.Gw;
                Bchi = H*G.Gthxy;
                BdelE = H*G.Guv + AdelEfun(dwdx,G.dzdx)*G.Gw;
-               shape_fun = obj.shape_function(xii); %used to extract T and GradT
-               
-               %extract the temperature and temperature gradient at Gauss
-               %point               
-               Tg =  shape_fun*Te;
-               gradTg = shape_fun*gradTe;
                
                %compute the internal actions
-               N = Cm*(BE*pe - alpha*Tg); %membrane internal actions
-               M = Cb*(Bchi*pe - alpha*gradTg); %bending internal actions
+               N = Cm*(BE*pe); %membrane internal actions
+               M = Cb*(Bchi*pe); %bending internal actions
                V = Cgamma*Bgamma*pe; %out of plane shear internal actions
                
                %integrate the internal force vector
@@ -178,8 +172,15 @@ classdef ShallowShellElement < Element
         
        
         
-        function [T2, globalSubs] = T2(obj) 
+        function [T2, globalSubs] = T2(obj,varargin) 
             %tensor associated to polynomial forces of order 2
+            
+            if ~isempty(varargin)
+                Ve = tensor(varargin{1});
+                flag = true;
+            else
+                flag = false;
+            end
             
             m = obj.nNodes*obj.nDOFPerNode; %number dofs per node
                 
@@ -227,13 +228,26 @@ classdef ShallowShellElement < Element
                 T2 = T2 + (dT21 + dT22)*detJ*wii;    
                 
             end
+            
+            if flag
+                
+                T2 = ttt(ttt(ttt(Ve,T2,1,1),Ve,2,1),Ve,2,1);
+               
+            end
                           
         end
         
               
         
-        function [T3, globalSubs] = T3(obj) 
+        function [T3, globalSubs] = T3(obj,varargin) 
             %tensor associated to polynomial forces of order 3
+            
+            if ~isempty(varargin)
+                Ve = tensor(varargin{1});
+                flag = true;
+            else
+                flag = false;
+            end
             
             m = obj.nNodes*obj.nDOFPerNode; %number dofs per node
                 
@@ -281,12 +295,19 @@ classdef ShallowShellElement < Element
                 
                 T3 = T3 + dT3ii*detJ*wii; %integrate     
                 
-            end          
+            end         
+            
+            if flag
+                
+                T3 = ttt(ttt(ttt(ttt(Ve,T3,1,1),Ve,2,1),Ve,2,1),Ve,2,1);
+               
+            end
+            
         end
             
                     
 
-        function Kd = stiffness_derivative(obj, p, v)
+        function Kd = stiffness_derivative(obj, v, varargin)
             
             % this function compute the derivative of the tangent stiffness 
             % constructed around point p, along the direction v
@@ -295,7 +316,14 @@ classdef ShallowShellElement < Element
             %v is the expansion direction        
 
             index = get_index(obj.nodeIDs,obj.nDOFPerNode); 
-            pe = p(index,:); % get the nodal displacements from global displacements
+            
+            if isempty(varargin)
+                pe = zeros(obj.nNodes*obj.nDOFPerNode,1);
+            else
+                p = varargin{1};
+                pe = p(index,:); % get the nodal displacements from global displacements
+            end
+            
             ve = v(index,:); % get the nodal directions from global direction
             
             %get the specifications for element integration
@@ -356,7 +384,7 @@ classdef ShallowShellElement < Element
         
         
                         
-        function [xe,Te,gradTe]  = extract_element_data(obj,x,T,gradT)    
+        function [xe]  = extract_element_data(obj,x)    
             % this function extracts the nodal displacements and T from 
             % full vectors
             
@@ -365,9 +393,7 @@ classdef ShallowShellElement < Element
             index = get_index(obj.nodeIDs,obj.nDOFPerNode);
             
             xe = x(index,:); % get the element displacements from global displacements
-            Te = T(obj.nodeIDs); %get the nodal temperatures for the element
-            gradTe = gradT(obj.nodeIDs); %temperature gradient
-            
+
         end
         
         
@@ -408,10 +434,10 @@ classdef ShallowShellElement < Element
             
         end
 
-        function Nfield = membrane_forces(obj,nodeIDsQueried,p,T,gradT)
+        function Nfield = membrane_forces(obj,nodeIDsQueried,p)
 
             %extract element data from full vector of unknowns
-            [pe,Te,gradTe]  = extract_element_data(obj,p,T,gradT);
+            pe  = extract_element_data(obj,p);
 
             %extract membrane forces at gauss points
             %get the specifications for element integration
@@ -451,18 +477,9 @@ classdef ShallowShellElement < Element
                BE = H*G.Guv + AEfun(dwdx,G.dzdx)*G.Gw;
                Bgamma = thxy + G.Gw;
                Bchi = H*G.Gthxy;
-               shape_fun = obj.shape_function(xii); %used to extract T and GradT
-               
-               %extract the temperature and temperature gradient at Gauss
-               %point               
-               Tg =  shape_fun*Te;
-               gradTg = shape_fun*gradTe;
                
                %compute the internal actions
-               membraneForcesGauss(ii,:) = (Cm*(BE*pe - alpha*Tg))'; %membrane internal actions
-               
-               M = Cb*(Bchi*pe - alpha*gradTg); %bending internal actions
-               V = Cgamma*Bgamma*pe; %out of plane shear internal actions
+               membraneForcesGauss(ii,:) = (Cm*BE*pe)'; %membrane internal actions
 
             end
             
@@ -474,10 +491,10 @@ classdef ShallowShellElement < Element
         end
 
 
-        function Mbfield = bending_moments(obj,nodeIDsQueried,p,T,gradT)
+        function Mbfield = bending_moments(obj,nodeIDsQueried,p)
 
             %extract element data from full vector of unknowns
-            [pe,Te,gradTe]  = extract_element_data(obj,p,T,gradT);
+            pe  = extract_element_data(obj,p);
 
             %extract membrane forces at gauss points
             %get the specifications for element integration
@@ -508,15 +525,9 @@ classdef ShallowShellElement < Element
                
                %compute the B matrices
                Bchi = H*G.Gthxy;
-               shape_fun = obj.shape_function(xii); %used to extract T and GradT
-               
-               %extract the temperature and temperature gradient at Gauss
-               %point               
-               Tg =  shape_fun*Te;
-               gradTg = shape_fun*gradTe;
                
                %compute the internal actions
-               momentsGauss(ii,:) = (Cb*(Bchi*pe - alpha*gradTg))'; %membrane internal actions
+               momentsGauss(ii,:) = (Cb*Bchi*pe)'; %membrane internal actions
 
             end
             
@@ -529,10 +540,10 @@ classdef ShallowShellElement < Element
 
 
 
-        function Vfield = shear_forces(obj,nodeIDsQueried,p,T,gradT)
+        function Vfield = shear_forces(obj,nodeIDsQueried,p)
 
             %extract element data from full vector of unknowns
-            [pe,Te,gradTe]  = extract_element_data(obj,p,T,gradT);
+            pe  = extract_element_data(obj,p);
 
             %extract membrane forces at gauss points
             %get the specifications for element integration
