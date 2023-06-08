@@ -162,7 +162,7 @@ classdef ImplicitNewmark < handle
         function [q,qd,qdd] = Correction(obj,q,qd,qdd,Da)
             q = q + obj.beta * obj.h^2 * Da;
             qd = qd + obj.gamma * obj.h * Da;
-            qdd = qdd + Da;
+            qdd = qdd + Da; %Da??
         end
     end
 end

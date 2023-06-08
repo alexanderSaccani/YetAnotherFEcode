@@ -24,7 +24,7 @@ nx = 15; % # elements along x
 ny = 8; % # elements along y
 
 eltype = 'QUAD8'; %'QUAD4'
-myElementConstructor = @()Quad8Shell(thickness, myMaterial,2);
+myElementConstructor = @()ThermQuad8Shell(thickness, myMaterial,2);
 [nodes, elements, nset] = mesh_2Drectangle(Lx,Ly,nx,ny,eltype);
 
 myMesh = Mesh(nodes);

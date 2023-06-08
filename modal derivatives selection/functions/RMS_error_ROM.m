@@ -20,16 +20,23 @@ function err = RMS_error_ROM(HFMdisp,HFMtime,ROMdisp,ROMtime,gdl,nodes)
 HFMofInt = HFMdisp(nodes,gdl,1:end);
 ROMofInt = ROMdisp(nodes,gdl,1:end);
 
-nTimeSamples = length(HFMtime);
+nTimeSamplesHFM = length(HFMtime);
+nTimeSamplesROM = length(ROMtime);
+
 nNodes = size(HFMofInt,1);
 nGdl = size(HFMofInt,2);
 
-HFMsamples = zeros(nNodes*nGdl,nTimeSamples);
-ROMsamples = zeros(nNodes*nGdl,nTimeSamples);
+HFMsamples = zeros(nNodes*nGdl,nTimeSamplesHFM);
+ROMsamples = zeros(nNodes*nGdl,nTimeSamplesROM);
 
-for ii = 1:nTimeSamples
+for ii = 1:nTimeSamplesHFM
    
     HFMsamples(:,ii) = reshape(squeeze(HFMofInt(:,:,ii)),[],1); 
+    
+end
+
+for ii = 1:nTimeSamplesROM
+   
     ROMsamples(:,ii) = reshape(squeeze(ROMofInt(:,:,ii)),[],1);
     
 end
