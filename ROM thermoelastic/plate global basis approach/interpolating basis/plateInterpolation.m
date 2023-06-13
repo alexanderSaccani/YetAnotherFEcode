@@ -1,6 +1,13 @@
-clearvars
-close all
-clc
+% author: ALEXANDER SACCANI - PHD CANDIDATE, ETH ZURICH, 
+% created: 1.12.2022
+% last modified: 30.01.2023
+
+% Shallow arc beam (the one implemented in Shobhit's paper: Jain, Tiso, Model order
+% reduction for temperature dependent nonlinear mechanical systems: A
+% multiple scales approach, Journal of Sound and Vibration, 2020
+
+
+clearvars ; close all; clc
 
 %% Thermoelastic clamped plate
 
@@ -35,7 +42,6 @@ nNodes = myMesh.nNodes;
 nDofPerNode = 5;
 
 elementsPlot = elements(:,1:4); %for plots
-nDofsFree = nNodes*nDofPerNode;
 
 %define z to assign to nodes
 w = height_midspan/Lx;
@@ -83,15 +89,13 @@ Assembly.DATA.Kc = Kc; %Kcold
 Assembly.DATA.M = M; %mass matrix
 Assembly.DATA.C = D; %damping matrix
 
-Mel = Assembly.Mesh.Elements(1).Object.mass_matrix();
-Kel = Assembly.Mesh.Elements(1).Object.tangent_stiffness_and_force(zeros(40,1),zeros(8,1),zeros(8,1));
-
+%%
 %% VMs and MDs Cold
 
 T_samples = zeros(myMesh.nNodes,1);
 gradT_samples = zeros(myMesh.nNodes,1);
 
-nVMs = 12;
+nVMs = 4;
 
 logic_MD = 1;
 VMMD = VMMD_thermal(Assembly,nVMs,logic_MD,T_samples,gradT_samples);
@@ -101,12 +105,11 @@ MDsC = VMMD.MDs.data{1};
 MDsNames = VMMD.MDs.names;
 eqPoint = VMMD.eq;
 
-VMs = cell(nVMs,1);
-for ii = 1:nVMs  
-   VMs{ii,1} = reshape(VMsC(:,ii),5,[]).';    
-end
-
-%%plot
+% VMs = cell(nVMs,1);
+% for ii = 1:nVMs  
+%    VMs{ii,1} = reshape(VMsC(:,ii),5,[]).';    
+% end
+% 
 % for ii = 1:nVMs
 %     figure; hold on;
 %     VM2plot = VMs{ii};
@@ -114,6 +117,24 @@ end
 %         VM2plot(:,2), VM2plot(:,3)], 'factor', 15*max(nodes(:,2)));
 %     title(['VM ',num2str(ii), ' f: ', num2str(fcold(ii)),' Hz']);
 % end
+% 
+% nMDs = size(MDsC,2);
+% MDs = cell(nMDs,1);
+% for ii = 1:nMDs  
+%    MDs{ii,1} = reshape(MDsC(:,ii),5,[]).';    
+% end
+% 
+% for ii = 1:nMDs
+%     figure; hold on;
+%     MD2plot = MDs{ii};
+%     PlotFieldonDeformedMesh([nodes,zNodes],elementsPlot, [MD2plot(:,1),...
+%         MD2plot(:,2), MD2plot(:,3)], 'factor',1*max(nodes(:,2)));
+%     title(['MD ',num2str(MDsNames(ii,1)),num2str(MDsNames(ii,2))]);
+% end
+
+
+%cold basis of VMs and MDs
+Vc = orth(Assembly.constrain_vector([VMsC,MDsC]));
 
 %% Define shape of temperature distribution
 
@@ -138,32 +159,32 @@ title('Temperature distribution shape')
 
 
 %% Hot modes
-% pStar = [0.4*Lx,0.4*Ly]';
-% T_samples = T_p(pStar);
-% gradT_samples = zeros(myMesh.nNodes,1);
-% 
-% nVMsHot = 4;
-% 
-% logic_MD = 1;
-% VMMD = VMMD_thermal(Assembly,nVMsHot,logic_MD,T_samples,gradT_samples);
-% fcold = VMMD.omega/2/pi;
-% VMsH = VMMD.VMs{1};
-% MDsH = VMMD.MDs.data{1};
-% MDsNames = VMMD.MDs.names;
-% 
-% VMsHot = cell(nVMsHot,1);
-% for ii = 1:nVMsHot  
-%    VMsHot{ii,1} = reshape(VMsH(:,ii),5,[]).';    
-% end
-% 
-% VMlist = [1,2,3,4];
-% for ii = 1:length(VMlist)
-%     figure; hold on;
-%     VM2plot = VMsHot{VMlist(ii)};
-%     PlotFieldonDeformedMesh([nodes,zNodes],elementsPlot, [VM2plot(:,1),...
-%         VM2plot(:,2), VM2plot(:,3)], 'factor', 15*max(nodes(:,2)));
-%     title(['VM ',num2str(VMlist(ii)), ' f: ', num2str(fcold(VMlist(ii))),' Hz']);
-% end
+pStar = [0.4*Lx,0.4*Ly]';
+T_samples = T_p(pStar);
+gradT_samples = zeros(myMesh.nNodes,1);
+
+nVMsHot = 4;
+
+logic_MD = 1;
+VMMD = VMMD_thermal(Assembly,nVMsHot,logic_MD,T_samples,gradT_samples);
+fcold = VMMD.omega/2/pi;
+VMsH = VMMD.VMs{1};
+MDsH = VMMD.MDs.data{1};
+MDsNames = VMMD.MDs.names;
+
+VMsHot = cell(nVMsHot,1);
+for ii = 1:nVMsHot  
+   VMsHot{ii,1} = reshape(VMsH(:,ii),5,[]).';    
+end
+
+VMlist = [1,2,3,4];
+for ii = 1:length(VMlist)
+    figure; hold on;
+    VM2plot = VMsHot{VMlist(ii)};
+    PlotFieldonDeformedMesh([nodes,zNodes],elementsPlot, [VM2plot(:,1),...
+        VM2plot(:,2), VM2plot(:,3)], 'factor', 15*max(nodes(:,2)));
+    title(['VM ',num2str(VMlist(ii)), ' f: ', num2str(fcold(VMlist(ii))),' Hz']);
+end
 
 % nMDs = size(MDsC,2);
 % MDs = cell(nMDs,1);
@@ -194,40 +215,43 @@ title('Temperature distribution shape')
 % p = [reshape(X,[],1),reshape(Y,[],1)]';
 
 %diagonal sampling
-numberTrainingSamples = 8;
+numberTrainingSamples = 20;
 p1 = 0:Lx/(numberTrainingSamples-1):Lx;%xc
 p2 = 0:Ly/(numberTrainingSamples-1):Ly;%yc
-psampl = [p1;p2];
-psampl = [[-2*Lx/(numberTrainingSamples-1);-2*Ly/(numberTrainingSamples-1)],...
-    [-Lx/(numberTrainingSamples-1);-Ly/(numberTrainingSamples-1)],psampl];
+p = [p1;p2];
+p = [[-Lx/(numberTrainingSamples-1);-Ly/(numberTrainingSamples-1)],...
+    [-2*Lx/(numberTrainingSamples-1);-2*Ly/(numberTrainingSamples-1)],p];
 
 figure
-plot(psampl(1,:),psampl(2,:),'x','markersize',10,'linewidth',2)
+plot(p(1,:),p(2,:),'x','markersize',10,'linewidth',2)
 hold on
 plot([0,Lx,Lx,0,0],[0,0,Ly,Ly,0],'-b','linewidth',2);
 xlabel('[m]'); ylabel('[m]');
 title('training grid')
 
 %% Construct Multiple ROMs
-nVMs = 4;
+nVMs = 6;
 thermEq = true;
 orthog = true;
-reordBasis = false;
-uncostrainBasis = true;
+reordBasis = true;
 gradFun.flag = true; %must put it true because it is shell element
 gradFun.fun = @(dummy) zeros(Assembly.Mesh.nNodes,1);
-gradFun.param = zeros(1,length(psampl));
-[ROMs,sampledVMs,sampledMDs,sampledEqDisp,natFreq] = multiple_ROMs_pthermal(Assembly,...
-            psampl, T_p, gradFun, nVMs, thermEq, orthog, reordBasis, uncostrainBasis);
-        
+gradFun.param = zeros(1,length(p));
+unconstrainBasis = true;
+[ROMs.models,sampledVMs,sampledMDs,sampledEqDisp,natFreq] = multiple_ROMs_pthermal(Assembly,...
+            p, T_p, gradFun, nVMs, thermEq, orthog, reordBasis, unconstrainBasis);
+  
+%do this inside of function next time
+ROMs.psamples = p;
+
 %% Plot the thermal equilibrium
-eq = sampledEqDisp{7};
+eq = sampledEqDisp{1};
 eq = reshape(eq,5,[]).';
 figure
 PlotFieldonDeformedMesh([nodes,zNodes],elementsPlot, [eq(:,1),...
             eq(:,2), eq(:,3)], 'factor',10);
 
-        
+%%
 %% Test on thermal trajectory
 
 %FORCING___________________________________________________________________
@@ -252,7 +276,7 @@ omForc = fForc*2*pi;
 TForc = 1/fForc;
 
 Fext = @(t) F0*cos(omForc*t);
-
+%%
 %TEMPERATURE VARIATION_____________________________________________________
 thetaTraj = 180/pi*atan(Ly/Lx);%30; %inclination of center trajectory
 h0 = 0;%Ly/4;
@@ -262,12 +286,12 @@ hoffset = 0.15;%Ly/3;
 p_fun_t = @(t)p_fun_t_vararg(thetaTraj,h0,time2Tranverse,Ly,hoffset,t);
 
 figure
-plot(psampl(1,:),psampl(2,:),'x','markersize',10,'linewidth',2)
+plot(p(1,:),p(2,:),'x','markersize',10,'linewidth',2)
 hold on
 plot([0,Lx,Lx,0,0],[0,0,Ly,Ly,0],'-b','linewidth',2);
 xlabel('[m]'); ylabel('[m]');
 title('training grid')
-timePlot = linspace(0,0.7*time2Tranverse,1000);
+timePlot = linspace(0,time2Tranverse,1000);
 pHist = p_fun_t(timePlot); hold on;
 plot(pHist(1,:),pHist(2,:),'-r','linewidth',2)
 %PlotMesh([nodes,zNodes],elementsPlot);
@@ -287,88 +311,24 @@ for ii = 1:length(tPlot)
     tii = tPlot(ii);
     hf = PlotFieldonMesh(nodes,elementsPlot,Tdynt(tii));
     title('Temperature distribution in time')
-    caxis([0, Tmax]); 
+    clim([0, Tmax]); 
     txt = text('Units', 'Normalized', 'Position', [0.5, 0.9], 'string',...
     ['t: ',num2str(round(tii,5)),'s'], 'fontsize', 12); drawnow limitrate
     delete(txt)
 end
 txt = text('Units', 'Normalized', 'Position', [0.4, 0.9], 'string',...
     ['t: ',num2str(round(tii,5)),'s'], 'fontsize', 12);
-%% ROM (variable basis)
-
-Vfunp = @(p) Vfun_p(ROMs,psampl,p);
-Vfunt = @(t) Vfunp(p_fun_t(t));
 
 
-%% Integrate nonlinear ROM (varying basis)
+%% RUN HFM
+%HFM_______________________________________________________________________
 
-%INTEGRATION
-runROM = false;
-
-tic
-if runROM 
-
-% settings for integration
-h = 2*pi/omForc/100; % time step for integration
-
-% Initial condition: equilibrium
-q0 = zeros(nDofsFree,1);
-qd0 = zeros(nDofsFree,1);
-
-% [K0,Fint0] = Assembly.tangent_stiffness_and_force(q0,Tdynt(0),gradTt(0));
-% Mconstr = Assembly.constrain_matrix(Assembly.DATA.M);
-% FinitialConstr = Assembly.constrain_vector(Fext(0)-Fint0);
-% qdd0 = full(Mconstr)\FinitialConstr;
-% qdd0 = Assembly.unconstrain_vector(qdd0);
-
-qdd0 = zeros(nDofsFree,1);
-
-% Instantiate object for nonlinear time integration
-TI_NL_r = ImplicitNewmarkRed2('timestep',h,'alpha',0.005);
-
-%Petrov Galerkin: projection basis for the residual
-W.basis = ROMs{1}.V; 
-W.flag = false;
-
-% nonlinear Residual evaluation function handle
-residual_r = @(q,qd,qdd,t,V)residual_thermal_VB(q,qd,qdd,t,Assembly,V,W,Fext,Tdynt,gradTt);
-
-% integrate equations with Newmark scheme
-TI_NL_r.Integrate(q0,qd0,qdd0,tint,residual_r,Vfunt);
-
-% project to full space
-uDynRed = TI_NL_r.Solution.q;
-vDynRed = TI_NL_r.Solution.qd; 
-aDynRed = TI_NL_r.Solution.qdd;
-
-
-
-%save solution
-dynRedVar.nlin.disp = decodeDofsNodes(uDynRed,nNodes,nDofPerNode); % (node, dof of node, tsamp)
-dynRedVar.nlin.vel = decodeDofsNodes(vDynRed,nNodes,nDofPerNode); % (node, dof of node, tsamp)
-dynRedVar.nlin.acc = decodeDofsNodes(aDynRed,nNodes,nDofPerNode); % (node, dof of node, tsamp)
-dynRedVar.nlin.time = TI_NL_r.Solution.time;
-
-<<<<<<< Updated upstream:ROM thermoelastic/plate global basis approach/variable basis/Global basis2/variableBasis2.m
-%save('ROMColdColdVarBasis1.mat','dynRedCold');
-=======
-save('ROMColdVarBasis1.mat','dynRedVar');
->>>>>>> Stashed changes:ROM thermoelastic/plate global basis approach/variable basis/variableBasis2.m
-
-else
-filenameROMRun = 'ROMColdVarBasis1.mat';
-load(filenameROMRun)
-end
-
-
-
-%% HFM
-runHFM = false;
+runHFM = true;
 
 if runHFM 
 
 % settings for integration
-h = 2*pi/omForc/35; % time step for integration
+h = 2*pi/omForc/25; % time step for integration
 
 % Initial condition: equilibrium
 nDofFull = length(Assembly.Mesh.EBC.unconstrainedDOFs);
@@ -396,59 +356,73 @@ uDynFull = Assembly.unconstrain_vector(uDynFull);
 dynFull.nlin.disp = decodeDofsNodes(uDynFull,nNodes,5); % (node, dof of node, tsamp)
 dynFull.nlin.time = TI_NL.Solution.time;
 
-%save('HFRun.mat','dynFull');
+%save('saved_simulations_new/HFRun.mat','dynFull');
 
 else
     
-filenameHFRun = 'HFRun.mat';
+filenameHFRun = 'saved_simulations_new/HFRun.mat';
 load(filenameHFRun)
 
 end
 
-%% Plot comparison
+%% Simulation with interpolated basis
 
+% Initial condition: equilibrium
+nDofRed = size(ROMs.models{1}.V,2);
+
+q0 = zeros(nDofRed,1);
+qd0 = zeros(nDofRed,1);
+qdd0 = zeros(nDofRed,1);
+
+% Instantiate object for nonlinear time integration
+TI_NL = ImplicitNewmark('timestep',h,'alpha',0.005);
+
+
+% % Constant basis
+% for ii = 1:numberTrainingSamples
+% 
+% ROMs.models{ii}.V = ROMs.models{2}.V; 
+% 
+% end
+
+% nonlinear Residual evaluation function handle
+residualInterpBasis = @(q,qd,qdd,t)thermal_residual_interpolation(q,qd,qdd,t,Assembly,ROMs,p_fun_t,Fext,Tdynt,gradTt);
+
+% integrate equations with Newmark scheme
+tic
+TI_NL.Integrate(q0,qd0,qdd0,tint,residualInterpBasis);
+toc
+
+% project to full space
+uDynRedInt = TI_NL.Solution.q;
+timeRedInt = TI_NL.Solution.time;
+
+uDynRedInt = to_full_int(uDynRedInt ,timeRedInt,p_fun_t,ROMs);
+
+%save solution
+dynRedInt.nlin.disp = decodeDofsNodes(uDynRedInt,nNodes,5); % (node, dof of node, tsamp)
+dynRedInt.nlin.time = timeRedInt;
+
+%save('saved_simulations_new/HFRun.mat','dynFull');
+
+%% Plot results
 %displacements
-plotDofLocation = [0.5,0.5]; %percentage of plate length (along x and y)
+plotDofLocation = [0.5,0.3]; %percentage of plate length (along x and y)
 node2plot = find_node(plotDofLocation(1)*Lx,plotDofLocation(2)*Ly,[],nodes); % node to plot
-dofPl = 4;
+dofPl = 3;
 
-description = 'reduction basis: first 4 cold VMs and MDs + static T + static TF, nDofRed = 22 ';
 fontsize = 15;
 linewidth = 2;
 
 figure('units','normalized','position',[0.3,0.1,0.6,0.7]); hold on
 plot(dynFull.nlin.time,squeeze(dynFull.nlin.disp(node2plot,dofPl,:)),'-k','linewidth',linewidth)
-plot(dynRedVar.nlin.time,squeeze(dynRedVar.nlin.disp(node2plot,dofPl,:)),'--r','linewidth',linewidth)
+plot(dynRedInt.nlin.time,squeeze(dynRedInt.nlin.disp(node2plot,dofPl,:)),'--r','linewidth',linewidth)
 %plot(dynRedGlobal.nlin.time,squeeze(dynRedGlobal.nlin.disp(node2plot,dofPl,:)),'-g','linewidth',1.5)
 xlabel('time [s]','fontsize',fontsize); ylabel('u [m]','fontsize', fontsize)
 title(['normalized plotted dof location: ',num2str(plotDofLocation(1)),',',...
     num2str(plotDofLocation(2)),',  dof: ',num2str(dofPl)]);
-ax = gca; grid on; ax.FontSize = fontsize; legend('HFM','RED');%'RED global','fontsize',fontsize);
+ax = gca; grid on; ax.FontSize = fontsize; legend('HFM','RED int');%,'RED global','fontsize',fontsize);
 
-figure('units','normalized','position',[0.3,0.1,0.6,0.7]); hold on
-plot(dynRedVar.nlin.time,squeeze(dynRedVar.nlin.vel(node2plot,dofPl,:)),'--r','linewidth',linewidth)
-%plot(dynRedGlobal.nlin.time,squeeze(dynRedGlobal.nlin.disp(node2plot,dofPl,:)),'-g','linewidth',1.5)
-xlabel('time [s]','fontsize',fontsize); ylabel('u [m/s]','fontsize', fontsize)
-title(['velocity, normalized plotted dof location: ',num2str(plotDofLocation(1)),',',...
-    num2str(plotDofLocation(2)),',  dof: ',num2str(dofPl)]);
-ax = gca; grid on; ax.FontSize = fontsize; %legend('HFM','RED');%'RED global','fontsize',fontsize);
-
-figure('units','normalized','position',[0.3,0.1,0.6,0.7]); hold on
-plot(dynRedVar.nlin.time,squeeze(dynRedVar.nlin.acc(node2plot,dofPl,:)),'--r','linewidth',linewidth)
-%plot(dynRedGlobal.nlin.time,squeeze(dynRedGlobal.nlin.disp(node2plot,dofPl,:)),'-g','linewidth',1.5)
-xlabel('time [s]','fontsize',fontsize); ylabel('u [m/(s^2)]','fontsize', fontsize)
-title(['acceleration, normalized plotted dof location: ',num2str(plotDofLocation(1)),',',...
-    num2str(plotDofLocation(2)),',  dof: ',num2str(dofPl)]);
-ax = gca; grid on; ax.FontSize = fontsize; %legend('HFM','RED');%'RED global','fontsize',fontsize);
-
-%%
-%plot HFM simulation
-dof2plot = 3;
-plot_dof_location = [0.5,0.5]; %percentage of length of beam
-node2plot = find_node(plot_dof_location(1)*Lx,plot_dof_location(2)*Ly,[],nodes); % node to plot
-figure
-plot(dynFull.nlin.time,squeeze(dynFull.nlin.disp(node2plot,dof2plot,:)))
-hold on
 
 
 
@@ -496,23 +470,6 @@ function p = p_fun_t_vararg(theta,h0,time2Tranverse,Ly,hoffset,t)
 
 [xc,yc] = linear_center_variation(theta,h0,time2Tranverse,Ly,hoffset,t);
 p = [xc;yc];
-
-end
-
-%Function to select basis
-function [V,basisID] = Vfun_p(ROMsampld,psamples,p)
-
-%p is column vector
-nSamples = size(psamples,2);
-dist_p_psamples = sum((psamples - repmat(p,1,nSamples)).^2);
-
-[~,closestModel] = min(dist_p_psamples);
-
-V = ROMsampld{closestModel}.V;
-disp(['model used is: ',num2str(closestModel)])
-
-basisID = closestModel;
-%V = ROMsampld{1}.V;
 
 end
 

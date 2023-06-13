@@ -53,6 +53,7 @@ BeamMesh.create_elements_table(Elements,myElementConstructor);
 
 %BeamMesh.set_essential_boundary_condition([1 BeamMesh.nNodes],[1 2 3],0) % Doubly clamped beam
 BeamMesh.set_essential_boundary_condition(1,[1 2 3],0) % clamped beam  (node,[constrained dofs],imposed disp.)
+BeamMesh.set_essential_boundary_condition(size(Nodes,1),[1],0)
 
 BeamAssembly = Assembly(BeamMesh);
 
@@ -86,7 +87,7 @@ M_C = BeamAssembly.constrain_matrix(M);
 
 %% Modal Analysis varying spring stiffness
 
-r_all = [0,2,5,10,20,40].';
+r_all = [0,2,5,10,20,50].';
 
 n_VMs = 2; % first n_VMs modes with lowest frequency calculated 
 
@@ -164,9 +165,9 @@ k_t = @(t) k_r(r_t(t));
 %% define forcing
 
 %define external forcing
-om_fext = omega(1,1) + (omega(2,1) - omega(1,1))/2; % (omega(1,1) + omega(2,1))/2;
+om_fext = omega(1,1) + 0.35*(omega(2,1) - omega(1,1)); % (omega(1,1) + omega(2,1))/2;
 T_fext = 2*pi/om_fext ; % period of ex. forcing
-F_ampl = 3; 
+F_ampl = 10; 
 
 node_fext = find_node(l/2,0,[],Nodes); % node where to put the force
 fext_dof = get_index(node_fext, nDofPerNode );
@@ -182,7 +183,7 @@ F_ext = @(t) F*sin(om_fext*t);
 
 % settings for integration
 tint = T_k/4; % integration interval
-h = T_fext/50; % time step for integration
+h = T_fext/30; % time step for integration
 
 % Initial condition: equilibrium
 q0 = zeros(nDofsC,1);
@@ -286,7 +287,7 @@ dyn.nlin_red.time = TI_NL.Solution.time;
 %%
 % plot results of nonlinear dynamic analysis_______________________________
 
-plot_dof_location = 0.5;%0.9%0.75;%2/3; %percentage of length of beam
+plot_dof_location = 0.4;%0.9%0.75;%2/3; %percentage of length of beam
 node2plot = find_node(plot_dof_location*l,0,[],Nodes); % node where to put the force
 plot_dof = get_index(node2plot, BeamAssembly.Mesh.nDOFPerNode );
 
@@ -314,11 +315,14 @@ plot(t,k_t(t));
 %% reduced order model (changing basis)
 
 %construct local ROMs
-r_samples = linspace(0,A_max,20);
+r_samples = linspace(0,A_max,3);
 k_samples = r_samples*k_beam;
 nVMs_ROM = 2;
 logic_MD = 1;
 [ROMS,k_ROMs,k_validity_range] = construct_ROM(k_samples,BeamAssembly,nDofsF,n_dof_spring,nVMs_ROM,logic_MD);
+
+%check subspace between basis
+anglSub = 180/pi*subspace(ROMS{1}.V,ROMS{length(r_samples)}.V);
 
 % Initial condition: equilibrium
 u_f_F = zeros(nDofsC,1);
@@ -473,26 +477,34 @@ node2plot = find_node(plot_dof_location*l,0,[],Nodes); % node where to put the f
 plot_dof = get_index(node2plot, BeamAssembly.Mesh.nDOFPerNode );
 
 figure;
-subplot 311; hold on;
+%subplot 311; 
+hold on;
 plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,1,:)),'-');
 plot(dyn.nlin_red.time,squeeze(dyn.nlin_red.disp(node2plot,1,:)),'-');
 plot(dyn.nlin_red_c.time,squeeze(dyn.nlin_red_c.disp(node2plot,1,:)),'-');
 plot(tchange,zeros(length(tchange),1),'x','markersize',5,'color','r');
 xlabel('t'); ylabel('u'); grid on; axis tight; 
+title('dispx')
 
-subplot 312; hold on;
+figure
+%subplot 312; 
+hold on;
 plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,2,:)),'-');
 plot(dyn.nlin_red.time,squeeze(dyn.nlin_red.disp(node2plot,2,:)),'-');
 plot(dyn.nlin_red_c.time,squeeze(dyn.nlin_red_c.disp(node2plot,2,:)),'-');
 plot(tchange,zeros(length(tchange),1),'x','markersize',5,'color','r');
 xlabel('t'); ylabel('v'); grid on; axis tight; 
+title('dispy')
 
-subplot 313; hold on;
+figure
+%subplot 313; 
+hold on;
 plot(dyn.nlin.time,squeeze(dyn.nlin.disp(node2plot,3,:)),'-');
 plot(dyn.nlin_red.time,squeeze(dyn.nlin_red.disp(node2plot,3,:)),'-');
 plot(dyn.nlin_red_c.time,squeeze(dyn.nlin_red_c.disp(node2plot,3,:)),'-');
 plot(tchange,zeros(length(tchange),1),'x','markersize',5,'color','r');
 xlabel('t'); ylabel('w'); grid on; axis tight;
+title('rot')
 
 %velocities
 figure;
@@ -624,7 +636,7 @@ for ii = 1:nROMs
     end
     
     if logic_MD == 1
-        ROMS{ii}.V = [VM,MD];
+        ROMS{ii}.V = orth([VM,MD]);
     else
         ROMS{ii}.V = VM;
     end

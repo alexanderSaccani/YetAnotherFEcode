@@ -233,7 +233,7 @@ T_dyn_t = @(t) T_dyn_xc(xc_dyn(t)); %evaluate the temperature profile in time
 % settings for integration
 t_forTto_tranverse_beam = T_th/2; % back and forth
 tint = t_forTto_tranverse_beam/3; %integration time
-h = T_fext/50; % time step for integration
+h = T_fext/30; % time step for integration
 
 % Precompute data for Assembly object
 BeamAssembly.DATA.M = M;
@@ -272,7 +272,7 @@ dyn.lin.time = TI_LIN.Solution.time;
 % Integrate nonlinear EOM__________________________________________________
 
 % settings for integration
-h = T_fext/50; % time step for integration
+h = T_fext/30; % time step for integration
 
 % Precompute data for Assembly object
 BeamAssembly.DATA.M = M;
@@ -485,7 +485,7 @@ end
 
 %% Reduced Order Model Construction 
 % define number of equidistant samples
-n_ROMs = 30;
+n_ROMs = 20;
 
 xc_sampl = linspace(-p/2,l+p/2,n_ROMs)'; %sample locations of center thermal pulse
 
@@ -510,7 +510,7 @@ ROMs.models = multiple_ROMs_thermal(BeamAssembly, T_sampl, number_VMs);
 %% Integrate nonlinear ROM
 
 % settings for integration
-h = T_fext/50; % time step for integration
+h = T_fext/30; % time step for integration
 
 n_dof_r = size(ROMs.models{1}.V,2);
 
@@ -553,7 +553,7 @@ for ii = 1:n_ROMs
 end
 
 % settings for integration
-h = T_fext/50; % time step for integration
+h = T_fext/30; % time step for integration
 
 % Initial condition: equilibrium
 n_dof_r = size(ROMs.models{1}.V,2);

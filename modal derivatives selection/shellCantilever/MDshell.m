@@ -169,7 +169,7 @@ node_force_dofs = get_index(nf, myMesh.nDOFPerNode );
 F1(node_force_dofs(3)) = 10;
 
 %frequency content
-fForc1 = 34; %excite second mode 
+fForc1 = 30; %excite second mode 
 omForc1 = 2*pi*fForc1;
 TForc1 = 1/fForc1;
 
