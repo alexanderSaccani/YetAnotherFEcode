@@ -219,7 +219,21 @@ gradFun.fun = @(dummy) zeros(Assembly.Mesh.nNodes,1);
 gradFun.param = zeros(1,length(psampl));
 [ROMs,sampledVMs,sampledMDs,sampledEqDisp,natFreq] = multiple_ROMs_pthermal(Assembly,...
             psampl, T_p, gradFun, nVMs, thermEq, orthog, reordBasis, uncostrainBasis);
+ROMsOverlap = cell(length(ROMs),1);
         
+for ii = 2:length(psampl)
+    
+   ROMsOverlap{ii}.V = orth([ROMs{ii}.V,ROMs{ii-1}.V]);
+    
+end
+ROMsOverlap{1}.V = ROMs{1}.V;
+
+%% Plot the thermal equilibrium
+eq = sampledEqDisp{7};
+eq = reshape(eq,5,[]).';
+figure
+PlotFieldonDeformedMesh([nodes,zNodes],elementsPlot, [eq(:,1),...
+            eq(:,2), eq(:,3)], 'factor',10);
 
         
 %% Test on thermal trajectory
@@ -261,7 +275,7 @@ hold on
 plot([0,Lx,Lx,0,0],[0,0,Ly,Ly,0],'-b','linewidth',2);
 xlabel('[m]'); ylabel('[m]');
 title('training grid')
-timePlot = linspace(0,time2Tranverse,1000);
+timePlot = linspace(0,0.7*time2Tranverse,1000);
 pHist = p_fun_t(timePlot); hold on;
 plot(pHist(1,:),pHist(2,:),'-r','linewidth',2)
 %PlotMesh([nodes,zNodes],elementsPlot);
@@ -271,7 +285,7 @@ Tdynt = @(t)T_p(p_fun_t(t));
 gradTt = @(t) zeros(Assembly.Mesh.nDOFs,1);
 
 %INTEGRATION TIME__________________________________________________________
-tint = 0.6*time2Tranverse;
+tint = 0.7*time2Tranverse;
 
 
 %plot dynamic T over the analysis
@@ -290,7 +304,7 @@ txt = text('Units', 'Normalized', 'Position', [0.4, 0.9], 'string',...
     ['t: ',num2str(round(tii,5)),'s'], 'fontsize', 12);
 %% ROM (variable basis)
 
-Vfunp = @(p) Vfun_p(ROMs,psampl,p);
+Vfunp = @(p) Vfun_p(ROMsOverlap,psampl,p);
 Vfunt = @(t) Vfunp(p_fun_t(t));
 
 
@@ -327,7 +341,7 @@ W.flag = false;
 residual_r = @(q,qd,qdd,t,V)residual_thermal_VB(q,qd,qdd,t,Assembly,V,W,Fext,Tdynt,gradTt);
 
 % integrate equations with Newmark scheme
-TI_NL_r.Integrate(q0,qd0,qdd0,0.5*tint,residual_r,Vfunt);
+TI_NL_r.Integrate(q0,qd0,qdd0,tint,residual_r,Vfunt);
 
 % project to full space
 uDynRed = TI_NL_r.Solution.q;
@@ -342,10 +356,10 @@ dynRedVar.nlin.vel = decodeDofsNodes(vDynRed,nNodes,nDofPerNode); % (node, dof o
 dynRedVar.nlin.acc = decodeDofsNodes(aDynRed,nNodes,nDofPerNode); % (node, dof of node, tsamp)
 dynRedVar.nlin.time = TI_NL_r.Solution.time;
 
-%save('saved_simulations/ROMColdColdPlate.mat','dynRedCold');
+%save('ROMColdColdVarBasis1.mat','dynRedCold');
 
 else
-filenameROMRun = 'ROMColdColdPlate.mat';
+filenameROMRun = 'ROMColdVarBasis1.mat';
 load(filenameROMRun)
 end
 
@@ -399,7 +413,7 @@ end
 %displacements
 plotDofLocation = [0.5,0.5]; %percentage of plate length (along x and y)
 node2plot = find_node(plotDofLocation(1)*Lx,plotDofLocation(2)*Ly,[],nodes); % node to plot
-dofPl = 3;
+dofPl = 4;
 
 description = 'reduction basis: first 4 cold VMs and MDs + static T + static TF, nDofRed = 22 ';
 fontsize = 15;

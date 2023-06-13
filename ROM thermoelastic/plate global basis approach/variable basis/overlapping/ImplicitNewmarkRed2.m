@@ -79,8 +79,8 @@ classdef ImplicitNewmarkRed2 < handle
             i = 1;    
             
             %initialize basis ID
-            [~,basisIDold] = Vfun(t);
-            del_q_new =  zeros(dimROM,1);
+            [V00,basisIDold] = Vfun(t);
+            del_q_old =  zeros(size(V00,2),1);
             
             while t < tmax
                 t = t+obj.h;
@@ -100,9 +100,7 @@ classdef ImplicitNewmarkRed2 < handle
                 else
                     del_q_new = del_q_old;
                 end
-                
-                
-               
+                         
                            
                 it = -1; % iteration counter
                  
@@ -179,8 +177,9 @@ classdef ImplicitNewmarkRed2 < handle
                 xd_old = xd_new;
                 xdd_old = xdd_new;
                 
+                %keep track of old basis and of old reduced coordinates
                 basisIDold = basisIDnew;
-                
+                del_q_old = del_q_new;
             end
             
             soltime = toc;
