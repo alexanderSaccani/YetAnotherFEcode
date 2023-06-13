@@ -331,7 +331,7 @@ qd0 = zeros(nDofsFree,1);
 qdd0 = zeros(nDofsFree,1);
 
 % Instantiate object for nonlinear time integration
-TI_NL_r = ImplicitNewmarkRed2('timestep',h,'alpha',0.005);
+TI_NL_r = ImplicitNewmarkRed3('timestep',h,'alpha',0.005);
 
 %Petrov Galerkin: projection basis for the residual
 W.basis = ROMs{1}.V; 
