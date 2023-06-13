@@ -356,7 +356,7 @@ dynRedVar.nlin.vel = decodeDofsNodes(vDynRed,nNodes,nDofPerNode); % (node, dof o
 dynRedVar.nlin.acc = decodeDofsNodes(aDynRed,nNodes,nDofPerNode); % (node, dof of node, tsamp)
 dynRedVar.nlin.time = TI_NL_r.Solution.time;
 
-%save('ROMColdColdVarBasis1.mat','dynRedCold');
+%save('ROMColdColdVarBasisOverl.mat','dynRedVar');
 
 else
 filenameROMRun = 'ROMColdVarBasis1.mat';
