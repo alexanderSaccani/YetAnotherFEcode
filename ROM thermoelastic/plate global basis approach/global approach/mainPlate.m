@@ -577,7 +577,7 @@ end
 
 %%
 %displacements
-plotDofLocation = [0.2,0.7]; %percentage of plate length (along x and y)
+plotDofLocation = [0.3,0.3]; %percentage of plate length (along x and y)
 node2plot = find_node(plotDofLocation(1)*Lx,plotDofLocation(2)*Ly,[],nodes); % node to plot
 dofPl = 3;
 
