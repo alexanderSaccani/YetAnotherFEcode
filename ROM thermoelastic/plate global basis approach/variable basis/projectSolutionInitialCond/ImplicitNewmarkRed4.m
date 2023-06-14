@@ -1,4 +1,4 @@
-classdef ImplicitNewmarkRed3 < handle
+classdef ImplicitNewmarkRed4 < handle
     % Class for Implicit Newmark time Integration with reduced model
     % cf. flowchart 7.21 in the following reference:
     % Geradin, M., & Rixen, D. (2015). Mechanical Vibrations : Theory and Application to Structural Dynamics (Third Edition). 
@@ -22,7 +22,7 @@ classdef ImplicitNewmarkRed3 < handle
     end
     
     methods
-        function TI = ImplicitNewmarkRed3(varargin)
+        function TI = ImplicitNewmarkRed4(varargin)
             %Parsint the input
             p = inputParser;
             addParameter(p,'timestep',TI.h, @(x)validateattributes(x, ...
@@ -79,32 +79,42 @@ classdef ImplicitNewmarkRed3 < handle
             i = 1;    
             
             %initialize basis ID
-            [V00,basisIDold] = Vfun(t);
-            del_q_old =  zeros(size(V00,2),1);
+            [V,basisIDold] = Vfun(t);
+            del_q_old =  zeros(size(V,2),1);
+            
             
             while t < tmax
+                
                 t = t+obj.h;
                 i = i+1;
 
                 %load basis
-                [V,basisIDnew] = Vfun(t);
-                dimROM = size(V,2);
-                  
+                [Vnew,basisIDnew] = Vfun(t);
+                                 
                 
                 %initial condition in delta displacement, vel and acc are 0
 %                 del_q_new = zeros(dimROM,1);
 %                 del_qd_new = del_q_new;
 
-                if basisIDold ~= basisIDnew
+                %update the basis
+                if basisIDold ~= basisIDnew 
+                   
+                    x_ic = x_old;
+                    xd_ic = xd_old;
+                    
+                    V = orth([Vnew,x_ic,xd_ic]); %update the basis
+                    dimROM = size(V,2);
+             
                     del_q_new =  zeros(dimROM,1);
                     Vinv = pinv(V);
                     x_old = V*Vinv*x_old;
                     xd_old = V*Vinv*xd_old;
                     xdd_old = V*Vinv*xdd_old;
+                    
                 else
                     del_q_new = del_q_old;
                 end
-                         
+                
                            
                 it = -1; % iteration counter
                  
