@@ -359,7 +359,7 @@ dynRedVar.nlin.time = TI_NL_r.Solution.time;
 %save('ROMColdColdVarBasis1.mat','dynRedCold');
 
 else
-filenameROMRun = 'ROMVarBasisOverl.mat';
+filenameROMRun = 'ROMProjBasis.mat';
 load(filenameROMRun)
 end
 
