@@ -7,7 +7,8 @@ classdef Material < matlab.mixin.SetGet
         DENSITY = 2700         % [Kg/m^3]
         DAMPING_MODULUS = 1e8   % [Pa-s]
         THERMAL_CONDUCTIVITY = 205  % [W/m K]
-        HEAT_CAPACITY = 900         % [J/kg K]
+        HEAT_CAPACITY = 900         % [J/kg K] %it should be specific heat
+        SPECIFIC_HEAT = 900 %[J/kg/K]
         CONVECTION_COEFFICIENT = 50 % [W/m^2 K]
         EMISSIVITY = 0             % [-] 
         % Feel free to add more material properties here with their default

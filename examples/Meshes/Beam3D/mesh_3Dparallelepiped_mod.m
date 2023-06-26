@@ -19,7 +19,7 @@
 %           faces. They are ordered as: x=0, y=0, z=0, x=l, y=w, z=t.
 
 function [nodes, elements, nset] = ...
-    mesh_3Dparallelepiped(eltype,l,w,t,nx,ny,nz)
+    mesh_3Dparallelepiped_mod(eltype,l,w,t,nx,ny,nz)
 
 nel = nx*ny*nz;
 
@@ -138,11 +138,27 @@ end
 
 % create nodes
 switch NE
-    case {8,20}
+    case {8}
+        nNodesPerElSet = 4;
         % element coordinates in physical space
         elnodes(:,1) = elnodes(:,1)*lx;
         elnodes(:,2) = elnodes(:,2)*ly;
         elnodes(:,3) = elnodes(:,3)*lz;
+        
+        
+        nodeSet1 = zeros(ny*nz,4);
+        nodeSet2 = zeros(nx*nz,4);
+        nodeSet3 = zeros(ny*nx,4);
+        nodeSet4 = zeros(ny*nz,4);
+        nodeSet5 = zeros(nx*nz,4);
+        nodeSet6 = zeros(ny*nx,4);
+        
+        countSet1 = 1;
+        countSet2 = 1;
+        countSet3 = 1;
+        countSet4 = 1;
+        countSet5 = 1; 
+        countSet6 = 1;
         
         nodes = zeros(nel*NE,3);
         nn = 1;
@@ -155,6 +171,97 @@ switch NE
                     elnodes_temp(:,2) = elnodes_temp(:,2)+ly*(jj-1);
                     elnodes_temp(:,3) = elnodes_temp(:,3)+lz*(kk-1);
                     nodes(nn:nn+NE-1,:) = elnodes_temp;
+                    
+                                
+                    if ii == 1
+                        nodeSet1(countSet1,:) = nn-1+[1,4,8,5]; 
+                        countSet1 = countSet1+1;
+                    elseif ii == nx
+                        nodeSet4(countSet4,:) = nn-1+[2,3,7,6]; 
+                        countSet4 = countSet4+1;
+                    end
+                    
+                    if jj == 1
+                        nodeSet2(countSet2,:) = nn-1+[1,2,6,5];
+                        countSet2 = countSet2+1;
+                    elseif jj == ny
+                        nodeSet5(countSet5,:) = nn-1+[4,3,7,8];
+                        countSet5 = countSet5+1;
+                    end
+                    
+                    if kk == 1
+                        nodeSet3(countSet3,:) = nn-1+[1,2,3,4];
+                        countSet3 = countSet3+1;
+                    elseif kk == nz
+                        nodeSet6(countSet6,:) = nn-1+[5,6,7,8];
+                        countSet6 = countSet6+1;
+                    end
+                   
+                    
+                    nn = nn+NE;
+                    
+                end
+            end
+        end
+        case {20}
+        nNodesPerElSet = 8;
+        % element coordinates in physical space
+        elnodes(:,1) = elnodes(:,1)*lx;
+        elnodes(:,2) = elnodes(:,2)*ly;
+        elnodes(:,3) = elnodes(:,3)*lz;
+        
+        
+        nodeSet1 = zeros(ny*nz,8);
+        nodeSet2 = zeros(nx*nz,8);
+        nodeSet3 = zeros(ny*nx,8);
+        nodeSet4 = zeros(ny*nz,8);
+        nodeSet5 = zeros(nx*nz,8);
+        nodeSet6 = zeros(ny*nx,8);
+        
+        countSet1 = 1;
+        countSet2 = 1;
+        countSet3 = 1;
+        countSet4 = 1;
+        countSet5 = 1; 
+        countSet6 = 1;
+        
+        nodes = zeros(nel*NE,3);
+        nn = 1;
+        for ii = 1:nx
+            for jj = 1:ny
+                for kk = 1:nz
+                    
+                    elnodes_temp = elnodes;
+                    elnodes_temp(:,1) = elnodes_temp(:,1)+lx*(ii-1);
+                    elnodes_temp(:,2) = elnodes_temp(:,2)+ly*(jj-1);
+                    elnodes_temp(:,3) = elnodes_temp(:,3)+lz*(kk-1);
+                    nodes(nn:nn+NE-1,:) = elnodes_temp;
+                    
+                                
+                    if ii == 1
+                        nodeSet1(countSet1,:) = nn-1+[1,12,4,20,8,16,5,17]; 
+                        countSet1 = countSet1+1;
+                    elseif ii == nx
+                        nodeSet4(countSet4,:) = nn-1+[2,10,3,19,7,14,6,18]; 
+                        countSet4 = countSet4+1;
+                    end
+                    
+                    if jj == 1
+                        nodeSet2(countSet2,:) = nn-1+[1,9,2,18,6,13,5,17];
+                        countSet2 = countSet2+1;
+                    elseif jj == ny
+                        nodeSet5(countSet5,:) = nn-1+[4,11,3,19,7,15,8,20];
+                        countSet5 = countSet5+1;
+                    end
+                    
+                    if kk == 1
+                        nodeSet3(countSet3,:) = nn-1+[1,9,2,10,3,11,4,12];
+                        countSet3 = countSet3+1;
+                    elseif kk == nz
+                        nodeSet6(countSet6,:) = nn-1+[5,13,6,14,7,15,8,16];
+                        countSet6 = countSet6+1;
+                    end
+                   
                     
                     nn = nn+NE;
                     
@@ -228,6 +335,30 @@ elements = reshape(elements,NE,nel)';
 % idb      = [(1:size(nodes,1))'    idb];         % [node id, dofs(3)
 % conn     = [(1:size(conn,1))'     conn];        % [elem id, dofs(60)]
 
+nodeSet1 = reshape(nodeSet1',[],1);
+nodeSet1 = ic(nodeSet1);
+nodeSet1 = (reshape(nodeSet1,nNodesPerElSet,[]))';
+
+nodeSet2 = reshape(nodeSet2',[],1);
+nodeSet2 = ic(nodeSet2);
+nodeSet2 = (reshape(nodeSet2,nNodesPerElSet,[]))';
+
+nodeSet3 = reshape(nodeSet3',[],1);
+nodeSet3 = ic(nodeSet3);
+nodeSet3 = (reshape(nodeSet3,nNodesPerElSet,[]))';
+
+nodeSet4 = reshape(nodeSet4',[],1);
+nodeSet4 = ic(nodeSet4);
+nodeSet4 = (reshape(nodeSet4,nNodesPerElSet,[]))';
+
+nodeSet5 = reshape(nodeSet5',[],1);
+nodeSet5 = ic(nodeSet5);
+nodeSet5 = (reshape(nodeSet5,nNodesPerElSet,[]))';
+
+nodeSet6 = reshape(nodeSet6',[],1);
+nodeSet6 = ic(nodeSet6);
+nodeSet6 = (reshape(nodeSet6,nNodesPerElSet,[]))';
+
 idnodes = (1:size(nodes,1));
 
 % external surfaces
@@ -239,8 +370,9 @@ face4_XL_nodes = idnodes(abs(nodes(:,1)-l)<tol);
 face5_YW_nodes = idnodes(abs(nodes(:,2)-w)<tol);
 face6_ZT_nodes = idnodes(abs(nodes(:,3)-t)<tol);
 
-nset = {face1_X0_nodes,face2_Y0_nodes,face3_Z0_nodes,face4_XL_nodes,...
+nset.nodes = {face1_X0_nodes,face2_Y0_nodes,face3_Z0_nodes,face4_XL_nodes,...
     face5_YW_nodes,face6_ZT_nodes};
+nset.connectivity = {nodeSet1,nodeSet2,nodeSet3,nodeSet4,nodeSet5,nodeSet6};
 
 nn = size(nodes,1);
 ndof = nn*3;

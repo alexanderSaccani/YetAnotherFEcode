@@ -66,7 +66,7 @@ classdef TE2D_Neumann < Element
             g = self.g; 
             r = self.r;  
             a = self.Material.CONVECTION_COEFFICIENT; 
-            K = r*a*h*[2/3 1/3;1/3 2/3];;
+            K = r*a*h*[2/3 1/3;1/3 2/3];
             F = K*T + k*g*h*ones(1,1);   
         end
 
