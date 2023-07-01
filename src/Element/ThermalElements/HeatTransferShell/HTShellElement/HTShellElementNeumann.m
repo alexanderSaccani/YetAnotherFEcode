@@ -1,11 +1,6 @@
-classdef HTNeumannContinuumElement < HeatTransferElement
+classdef HTShellElementNeumann< HeatTransferElement
     
  %neumann continuum element for HEAT TRANSFER boundary conditions
-    
-    % ContinuumElement collects all the functions shared by all the
-    % elements based on a continuum deformation model. It includes both
-    % planar and solid elements, such as quadrilaterals, hexahedra, 
-    % tetrahedra and wedges.
     
     properties (Abstract)
         nodes               % global coordinates of element nodes
@@ -18,32 +13,22 @@ classdef HTNeumannContinuumElement < HeatTransferElement
         initialization     	% some 0-matrices to speedup numerical integration
         elType              % 'HEX'/'QUAD'/'TET'/'TRI'/'WED'
                             % --> see method "quadrature_rule"!
+        thickness
     end
     
-%     properties (Dependent) %WHAT ARE THESE FOR??
-%         area                % area of a 2D element (NaN otherwise)
-%         vol                	% volume of a 3D element (NaN otherwise)
-%     end
-   
-%     methods (Abstract) % function that every continuum element must implement
-%         [G,detJ,dH] = shape_function_derivatives(self, X)
-%         N = shape_functions(X)
-%         X = natural_coordinates
-%     end
-    
+
     methods
         
         % MINIMUM REQUIRED FUNCTIONS ______________________________________
         
-        function ContinuumElementConstructor(self, Material, Ngauss)
+        function ShellElementConstructor(self, Material, Ngauss)
             % _____________________________________________________________
             %
             % ContinuumElementConstructor(self, Material, Ngauss)
             % defines element's properties
             %______________________________________________________________
             self.Material = Material;
-            ne = self.nelDOFs;
-            nd = self.nDim;
+
             
             quadrature_rule(self, Ngauss);
             
@@ -66,18 +51,24 @@ classdef HTNeumannContinuumElement < HeatTransferElement
                     W = zeros(Ngauss^DIM, 1);
                     cont = 1;
                     for ii = 1:Ngauss
-                        for jj = 1:Ngauss
-                            if DIM == 3
-                                for kk = 1:Ngauss
-                                    X(:,cont) = [x(ii) x(jj) x(kk)].';
-                                    W(cont) = w(ii)*w(jj)*w(kk);
+                        if (DIM == 3 || DIM == 2)
+                            for jj = 1:Ngauss
+                                if DIM == 3
+                                    for kk = 1:Ngauss
+                                        X(:,cont) = [x(ii) x(jj) x(kk)].';
+                                        W(cont) = w(ii)*w(jj)*w(kk);
+                                        cont = cont+1;
+                                    end
+                                elseif DIM == 2
+                                    X(:,cont) = [x(ii) x(jj)].';
+                                    W(cont) = w(ii)*w(jj);
                                     cont = cont+1;
                                 end
-                            elseif DIM == 2
-                                X(:,cont) = [x(ii) x(jj)].';
-                                W(cont) = w(ii)*w(jj);
-                                cont = cont+1;
                             end
+                        elseif DIM == 1
+                            X(:,cont) = x(ii);
+                            W(cont) = w(ii);
+                            cont = cont+1;
                         end
                     end
                     self.quadrature.Ng = Ngauss;
@@ -119,6 +110,8 @@ classdef HTNeumannContinuumElement < HeatTransferElement
             X = self.quadrature.X;
             W = self.quadrature.W;
             
+            t = self.thickness;
+            
             Lth = self.initialization.matrix;          
 
             %gauss integration
@@ -134,17 +127,12 @@ classdef HTNeumannContinuumElement < HeatTransferElement
                 
                 %define the integration coefficient that is needed to
                 %perform the boundary integral
-                if self.nDim == 2 %for dimension 2 (integral on a surface)
-                    intCoeff = norm([0,       -J(3,1),     J(2,1);
-                                    J(3,1),   0,         -J(1,1);
-                                    -J(2,1),  J(1,1),       0   ]*J(:,2));
-                else
-                    intCoeff = norm(J); %for dimension 1 (integral on a line)
-                end
+
+                intCoeff = norm(J); %for dimension 1 (integral on a line)
 
                 N = self.shape_functions(Xii); %column vector
                 
-                Lth = Lth + N*N'*intCoeff*Wii;
+                Lth = Lth + t*(N*N')*intCoeff*Wii;
                     
             end
                

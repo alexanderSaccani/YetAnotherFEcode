@@ -15,16 +15,16 @@ set(myMaterial,'THERMAL_CONDUCTIVITY', k, 'SPECIFIC_HEAT', c, 'DENSITY', rho);
 
 
 % Element
-myElementConstructor = @()HEX20ElementHT(myMaterial);
+myElementConstructor = @()HEX8ElementHT(myMaterial);
 
 % MESH_____________________________________________________________________
 l = 2;
 w = 2;
-t = .1;
-nx = 30;
-ny = 30;
-nz = 2;
-elementType = 'HEX20';
+t = .9;
+nx = 15;
+ny = 15;
+nz = 15;
+elementType = 'HEX8';
 [nodes, elements, nset]=mesh_3Dparallelepiped_mod(elementType,l,w,t,nx,ny,nz);
 
 %nodes(:,3) = nodes(:,3)+1*t*(cos(2*pi/l*nodes(:,1))+1);
@@ -36,8 +36,8 @@ myMesh.create_elements_table(elements,myElementConstructor);
 %%
 % BOUNDARY CONDITONS
 Timposed = 0;
-Timposed1 = 250;
-Timposed2 = 150;
+Timposed1 = 0;%250;
+Timposed2 = 0;%150;
 setNatBCs = [nset.nodes{1}];
 %setNatBCs = [nset.nodes{1},nset.nodes{2},nset.nodes{5}];
 setNatBCs1 = nset.nodes{4};
@@ -48,11 +48,11 @@ myMesh.set_essential_boundary_condition(setNatBCs1,1,Timposed1)
 myMesh.set_essential_boundary_condition(setNatBCs2,1,Timposed2)
 
 % NATURAL BOUNDARY CONDITIONS (CREATE NEUMANN ELEMENTS)
-setNodeNeu_index = 2;
+setNodeNeu_index = 6;
 nodesNeumann = nset.nodes{setNodeNeu_index};
 nodesCoordNeumann = nodes(nset.nodes{setNodeNeu_index},:);
 elementsNeumann =  nset.connectivity{setNodeNeu_index};
-myElementConstructor = @()HEX20NeuElementHT(myMaterial);
+myElementConstructor = @()HEX8NeuElementHT(myMaterial);
 myMesh.create_elements_table(elementsNeumann,myElementConstructor,'isBoundary',true);
 
 % ASSEMBLY OF SYSTEM MATRICES
@@ -71,7 +71,23 @@ loadNaturalBCs = Assembly.constrain_vector(-K*TfromBCs); %thermal load from impo
 
 %external applied thermal load (flux)
 q = zeros(Assembly.Mesh.nNodes,1);
-q(nodesNeumann) = -200;
+%q(nodesNeumann) = -200;
+
+
+
+%externally applied thermal load (on shell surface)
+xc = l/2;
+yc = w/2;
+d = norm([xc,yc])^2;
+WattsInSurface = 400;
+xnodes = nodes(:,1);
+ynodes = nodes(:,2);
+coeffW = WattsInSurface/l/w;
+qS = (-((xnodes-xc).^2+(ynodes-yc).^2)+d)*1/d*coeffW;
+q(nodesNeumann) = qS(nodesNeumann);
+
+
+
 
 %constrain thermal conductivity matrix and solve system
 K_c = Assembly.constrain_matrix(K);

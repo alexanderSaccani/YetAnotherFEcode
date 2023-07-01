@@ -1,5 +1,5 @@
-classdef HEX20NeuElementHT < HTNeumannContinuumElement
-    %BRICK 8 nodes brick element for heat transfer problem
+classdef QUAD8ShellHT < HTShellElement
+    %Shell 8 nodes element for heat transfer problem
     
     properties
         nodes = []          % global coordinates of element nodes
@@ -11,7 +11,8 @@ classdef HEX20NeuElementHT < HTNeumannContinuumElement
         quadrature       	% weights and points for gauss quadrature
         Material           	% Object of class Material
         initialization     	% some 0-matrices to speedup numerical integration
-        elType = 'HEXNEU'
+        elType = 'QUAD'
+        
     end
     
     properties
@@ -24,60 +25,27 @@ classdef HEX20NeuElementHT < HTNeumannContinuumElement
         
         % MINIMUM REQUIRED FUNCTIONS ______________________________________
         
-        function self = HEX20NeuElementHT(Material, Ngauss)
+        function self = QUAD8ShellHT(Material, thickness, Ngauss)
             % _____________________________________________________________
             %
             % SELF-FUNCTION
-            % self = Hex8Element(Material,Ngauss)
+            % self = QUAD8ShellHT(Material,thickness,Ngauss)
             % defines element's properties
             %______________________________________________________________
-            if nargin == 1
+            if nargin == 2
                 Ngauss = 2;
             end
-            self.thickness = 1;
-            ContinuumElementConstructor(self, Material, Ngauss);
+            self.thickness = thickness;
+            ShellElementConstructor(self, Material, Ngauss);
         end
         
+       
         
-        function J = jacobian_matrix(self, X)
+        function [dH,J] = shape_function_derivatives(self, X)
             %______________________________________________________________
             %
-            % Input: X is the vector of natural coordinates
-            % Output: J is the jacobian matrix of physical coordinates (dim
-            % = 3) with respect to the natural coordinates (dim = 2).
-            %          J = [dxdX1, dxdX2;
-            %               dydX1, dydX2;
-            %               dzdX1, dzdX2]
-            %______________________________________________________________
-            r = X(1);
-            s = X(2);
-            xyz = self.nodes; %4x3 matrix with xyz coordinates of nodes (stored row-wise)
-            % shape function derivatives in natural coordinates
-            dHn = 1/4*[ s-1,  r-1; 
-                        1-s, -r-1; 
-                        s+1,  r+1; 
-                       -s-1,  1-r].';
-            J = dHn*xyz;
-            J = J.'; %Jacobian of transformation J = [dxdX1, dxdX2;
-                     %                                dydX1, dydX2;
-                     %                                dzdX1, dzdX2]
-            
-%             detJ = det(J);
-%             dH = J\dHn;	% derivatives in physical coordinates,
-%                       	% 2x8 matrix, [dNi_dx; dNi_dy]
-%                        	% with i = 1...8
-%             G = self.initialization.G;
-%             G(1:2,1:2:end) = dH;
-%             G(3:4,2:2:end) = dH;
-
-
-            %______________________________________________________________
+            % [dH,J] = shape_function_derivatives(self, X)
             %
-            % [G,detJ,dH] = shape_function_derivatives(self, X)
-            % G = shape function derivatives in physical coordinates, s.t.
-            % th=G*p with th={ux uy vx vy}' (ux=du/dx...)
-            % and p={u1,v1,...,u8,v8}' (nodal displacements).
-            % detJ = det(J), J=jacobian
             %______________________________________________________________
             g = X(1);
             h = X(2);
@@ -92,15 +60,10 @@ classdef HEX20NeuElementHT < HTNeumannContinuumElement
                                                       1/2 - h^2/2,                                      -h*(g + 1);
                                                        -g*(h + 1),                                     1/2 - g^2/2;
                                                       h^2/2 - 1/2,                                       h*(g - 1)]';
-            J = dHn*xy;
-            detJ = det(J);
+            J = dHn*xyz; %2x3 matrix, dxdX'
             dH = J\dHn;	% derivatives in physical coordinates,
-                      	% 2x16 matrix, [dNi_dx; dNi_dy]
-                       	% with i = 1...10
-            G = self.initialization.G;
-            G(1:2,1:2:end) = dH;
-            G(3:4,2:2:end) = dH;
-
+                      	% 3x8 matrix, [dNi_dx; dNi_dy; dNi_dz]
+                       	% with i = 1...8
 
         end
         
@@ -109,29 +72,38 @@ classdef HEX20NeuElementHT < HTNeumannContinuumElement
     end
         
     
-   
+    
         
     methods (Static)
         
         function N = shape_functions(X)
-            % N = shape_functions(g,h,r)
+             % N = shape_functions(g,h,r)
             % SHAPE FUNCTIONS FOR A 8-NODED QUADRILATERAL
             % - see Abaqus documentation:
             % Abaqus theory guide > Elements > Continuum elements > ...
             % ... > 3.2.4 Solid isoparametric quadrilaterals and hexahedra
             g = X(1);
             h = X(2);
-            N = 1/4*[ +(g - 1)*(h - 1); 
-                      -(g + 1)*(h - 1);
-                      +(g + 1)*(h + 1); 
-                      -(g - 1)*(h + 1)];
+            N = 1/4*[...
+                    -(1-g)*(1-h)*(1+g+h); 
+                    -(1+g)*(1-h)*(1-g+h);
+                    -(1+g)*(1+h)*(1-g-h); 
+                    -(1-g)*(1+h)*(1+g-h);
+                    2*(1-g)*(1+g)*(1-h);  
+                    2*(1-h)*(1+h)*(1+g);
+                    2*(1-g)*(1+g)*(1+h);  
+                    2*(1-h)*(1+h)*(1-g)]';
         end
         
         function X = natural_coordinates
-            X = [-1  -1   % node 1
-                  1  -1   % node 2
-                  1   1	  % node 3
-                 -1   1]; % node 4
+            X = [-1 -1 -1
+                 +1 -1 -1
+                 +1 +1 -1
+                 -1 +1 -1
+                 -1 -1 +1
+                 +1 -1 +1
+                 +1 +1 +1
+                 -1 +1 +1];
         end
         
     end

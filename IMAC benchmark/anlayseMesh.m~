@@ -1,0 +1,9 @@
+close all
+clc
+clearvars
+
+load('elements.mat')
+elements(: = elements()
+load('nodes.mat')
+
+PlotMesh(nodes,elements,1);

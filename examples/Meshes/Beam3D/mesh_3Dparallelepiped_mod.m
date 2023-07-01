@@ -239,26 +239,26 @@ switch NE
                     
                                 
                     if ii == 1
-                        nodeSet1(countSet1,:) = nn-1+[1,12,4,20,8,16,5,17]; 
+                        nodeSet1(countSet1,:) = nn-1+[1,4,8,5,17,12,20,16]; 
                         countSet1 = countSet1+1;
                     elseif ii == nx
-                        nodeSet4(countSet4,:) = nn-1+[2,10,3,19,7,14,6,18]; 
+                        nodeSet4(countSet4,:) = nn-1+[2,3,7,6,10,19,14,18]; 
                         countSet4 = countSet4+1;
                     end
                     
                     if jj == 1
-                        nodeSet2(countSet2,:) = nn-1+[1,9,2,18,6,13,5,17];
+                        nodeSet2(countSet2,:) = nn-1+[1,2,6,5,9,18,13,17];
                         countSet2 = countSet2+1;
                     elseif jj == ny
-                        nodeSet5(countSet5,:) = nn-1+[4,11,3,19,7,15,8,20];
+                        nodeSet5(countSet5,:) = nn-1+[4,3,7,8,11,19,15,20];
                         countSet5 = countSet5+1;
                     end
                     
                     if kk == 1
-                        nodeSet3(countSet3,:) = nn-1+[1,9,2,10,3,11,4,12];
+                        nodeSet3(countSet3,:) = nn-1+[1,2,3,4,9,10,11,12];
                         countSet3 = countSet3+1;
                     elseif kk == nz
-                        nodeSet6(countSet6,:) = nn-1+[5,13,6,14,7,15,8,16];
+                        nodeSet6(countSet6,:) = nn-1+[5,6,7,8,13,14,15,16];
                         countSet6 = countSet6+1;
                     end
                    
