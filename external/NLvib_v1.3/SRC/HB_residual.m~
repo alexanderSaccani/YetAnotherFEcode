@@ -65,14 +65,9 @@ switch lower(analysis_type)
         Fex(h*n+(1:n)) = Fex1;
         dFex = zeros(size(Fex,1),length(X));
         
-        %add the option of intertial excitation force (Fex = omega^2*Fex2)
-        if ~isempty(system.Fex2)
-            Fex2 = system.Fex2;
-            Fex(h*n+(1:n)) = Fex(h*n+(1:n)) + X(end)^2*Fex2; % in time domain: Fex2*om^2*cos(omega*t)
-            %Fex(h*n+(1:n)) = Fex(h*n+(1:n)) + Fex2; % in time domain: Fex2*om^2*cos(omega*t)
-            dFex(h*n+(1:n),end) = dFex(h*n+(1:n),end)+2*X(end)*Fex2;
-        end
-        
+        %add the option of intertial excitation force ( Fex = omega^2*Fex2)
+        if isfield(system.Fex2)
+            Fex = Fex(h*n+(1:n)) + Fex;
         % Derivative of damping (does not depend on unknowns in the case of
         % frequency response)
         dD_dalpha = 0*M; dalpha = zeros(1,length(X));

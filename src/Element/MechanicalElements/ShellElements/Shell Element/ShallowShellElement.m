@@ -597,7 +597,7 @@ classdef ShallowShellElement < Element
        
         function [N,Gout,detJ] = Gfun(obj,X)
             
-        %this function compute the derivatives from nodal displacements and 
+        %this function computes the derivatives from nodal displacements and 
         %shape functions through matrix G
         
             %X -> vector of natural coordinates

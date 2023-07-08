@@ -3,6 +3,7 @@ function AnimateFieldonMesh(Nodes,Elements,F,filename,varargin)
 
 myVideo = VideoWriter(['Examples/Results/' filename '.avi']);
 
+
 if nargin == 7
     myVideo.FrameRate = varargin{1};
 else
