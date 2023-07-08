@@ -26,7 +26,6 @@ plot(ynodesProfile,znodesProfile,'-*');
 grid on
 axis('equal')
 
-
 [ynodesProfile,I] = sort(ynodesProfile);
 znodesProfile = znodesProfile(I);
 
@@ -35,4 +34,13 @@ a = [ynodesProfile,znodesProfile];
 figure
 plot(ynodesProfile,znodesProfile,'-x');
 grid on
+axis('equal')
+
+
+
+%%
+indz0 = nodes(:,3) == 0;
+nodesz0 = nodes(indz0,:);
+figure
+plot(nodes(indz0,1),nodes(indz0,2),'*')
 axis('equal')

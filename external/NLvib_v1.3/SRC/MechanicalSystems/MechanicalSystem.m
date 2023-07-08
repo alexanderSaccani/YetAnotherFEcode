@@ -47,6 +47,7 @@ classdef MechanicalSystem < handle
         D                   % damping matrix
         nonlinear_elements  % nonlinear elements structure
         Fex1                % excitation structure
+        Fex2 = []           % excitation vector (that in HB residual is multiplied by om^2)
     end
     
     methods
