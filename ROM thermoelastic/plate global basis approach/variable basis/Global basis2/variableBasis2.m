@@ -303,7 +303,7 @@ Vfunt = @(t) Vfunp(p_fun_t(t));
 %% Integrate nonlinear ROM (varying basis)
 
 %INTEGRATION
-runROM = false;
+runROM = true;
 
 tic
 if runROM 

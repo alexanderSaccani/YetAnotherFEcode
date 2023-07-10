@@ -82,6 +82,10 @@ classdef ImplicitNewmarkRed4 < handle
             [V,basisIDold] = Vfun(t);
             del_q_old =  zeros(size(V,2),1);
             
+
+            %initialize switchBasis 
+            switchBasis.angle = [];
+            switchBasis.time = [];
             
             while t < tmax
                 
@@ -102,6 +106,10 @@ classdef ImplicitNewmarkRed4 < handle
                     x_ic = x_old;
                     xd_ic = xd_old;
                     
+                    %compute angle between new basis and ics
+                    anglDisp = subspace(Vnew,x_ic);
+                    anglVel = subspace(Vnew,xd_ic);
+                    
                     V = orth([Vnew,x_ic,xd_ic]); %update the basis
                     dimROM = size(V,2);
              
@@ -110,6 +118,10 @@ classdef ImplicitNewmarkRed4 < handle
                     x_old = V*Vinv*x_old;
                     xd_old = V*Vinv*xd_old;
                     xdd_old = V*Vinv*xdd_old;
+
+                    %store info for analysis
+                    switchBasis.angle = [switchBasis.angle,[anglDisp;anglVel]];
+                    switchBasis.time = [switchBasis.time,t];
                     
                 else
                     del_q_new = del_q_old;
@@ -194,6 +206,7 @@ classdef ImplicitNewmarkRed4 < handle
                 %keep track of old basis and of old reduced coordinates
                 basisIDold = basisIDnew;
                 del_q_old = del_q_new;
+
             end
             
             soltime = toc;
@@ -204,6 +217,8 @@ classdef ImplicitNewmarkRed4 < handle
             obj.Solution.NR = NR;
             obj.Solution.R = R;
             obj.Solution.soltime = soltime;
+            
+            obj.Solution.switchBasis = switchBasis;
             
         end
         

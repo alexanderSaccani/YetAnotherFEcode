@@ -194,11 +194,13 @@ title('Temperature distribution shape')
 % p = [reshape(X,[],1),reshape(Y,[],1)]';
 
 %diagonal sampling
-numberTrainingSamples = 8;
+numberTrainingSamples = 14;
 p1 = 0:Lx/(numberTrainingSamples-1):Lx;%xc
 p2 = 0:Ly/(numberTrainingSamples-1):Ly;%yc
 psampl = [p1;p2];
-psampl = [[-2*Lx/(numberTrainingSamples-1);-2*Ly/(numberTrainingSamples-1)],...
+psampl = [[-4*Lx/(numberTrainingSamples-1);-4*Ly/(numberTrainingSamples-1)],...
+    [-3*Lx/(numberTrainingSamples-1);-3*Ly/(numberTrainingSamples-1)],...
+    [-2*Lx/(numberTrainingSamples-1);-2*Ly/(numberTrainingSamples-1)],...
     [-Lx/(numberTrainingSamples-1);-Ly/(numberTrainingSamples-1)],psampl];
 
 figure
@@ -311,7 +313,7 @@ Vfunt = @(t) Vfunp(p_fun_t(t));
 %% Integrate nonlinear ROM (varying basis)
 
 %INTEGRATION
-runROM = false;
+runROM = true;
 
 if runROM 
 
@@ -348,7 +350,8 @@ uDynRed = TI_NL_r.Solution.q;
 vDynRed = TI_NL_r.Solution.qd; 
 aDynRed = TI_NL_r.Solution.qdd;
 
-
+timeSwitch = TI_NL_r.Solution.switchBasis.time;
+angleSwitch = TI_NL_r.Solution.switchBasis.angle;
 
 %save solution
 dynRedVar.nlin.disp = decodeDofsNodes(uDynRed,nNodes,nDofPerNode); % (node, dof of node, tsamp)
@@ -356,10 +359,12 @@ dynRedVar.nlin.vel = decodeDofsNodes(vDynRed,nNodes,nDofPerNode); % (node, dof o
 dynRedVar.nlin.acc = decodeDofsNodes(aDynRed,nNodes,nDofPerNode); % (node, dof of node, tsamp)
 dynRedVar.nlin.time = TI_NL_r.Solution.time;
 
-%save('ROMColdColdVarBasis1.mat','dynRedCold');
+
+
+%save('ROM10samples.mat','dynRedVar','timeSwitch,'angleSwitch');
 
 else
-filenameROMRun = 'ROMProjBasis.mat';
+filenameROMRun = 'ROM10samples.mat';
 load(filenameROMRun)
 end
 
@@ -417,28 +422,32 @@ dofPl = 4;
 
 description = 'reduction basis: first 4 cold VMs and MDs + static T + static TF, nDofRed = 22 ';
 fontsize = 15;
-linewidth = 2;
+linewidth = 1.5;
 
 figure('units','normalized','position',[0.3,0.1,0.6,0.7]); hold on
-plot(dynFull.nlin.time,squeeze(dynFull.nlin.disp(node2plot,dofPl,:)),'-k','linewidth',linewidth)
-plot(dynRedVar.nlin.time,squeeze(dynRedVar.nlin.disp(node2plot,dofPl,:)),'--r','linewidth',linewidth)
+plot(dynRedVar.nlin.time,squeeze(dynRedVar.nlin.disp(node2plot,dofPl,:)),'-r','linewidth',linewidth)
+plot(dynFull.nlin.time,squeeze(dynFull.nlin.disp(node2plot,dofPl,:)),'--k','linewidth',linewidth)
+%plot(timeSwitch,zeros(length(timeSwitch),1),'*','color','green','MarkerSize',10)
+xline(timeSwitch,'color','green','linewidth',2,'LineStyle','--')
 %plot(dynRedGlobal.nlin.time,squeeze(dynRedGlobal.nlin.disp(node2plot,dofPl,:)),'-g','linewidth',1.5)
 xlabel('time [s]','fontsize',fontsize); ylabel('u [m]','fontsize', fontsize)
 title(['normalized plotted dof location: ',num2str(plotDofLocation(1)),',',...
     num2str(plotDofLocation(2)),',  dof: ',num2str(dofPl)]);
-ax = gca; grid on; ax.FontSize = fontsize; legend('HFM','RED');%'RED global','fontsize',fontsize);
+ax = gca; grid on; ax.FontSize = fontsize; legend('RED','HFM');%'RED global','fontsize',fontsize);
 
 figure('units','normalized','position',[0.3,0.1,0.6,0.7]); hold on
-plot(dynRedVar.nlin.time,squeeze(dynRedVar.nlin.vel(node2plot,dofPl,:)),'--r','linewidth',linewidth)
+plot(dynRedVar.nlin.time,squeeze(dynRedVar.nlin.vel(node2plot,dofPl,:)),'-r','linewidth',linewidth)
 %plot(dynRedGlobal.nlin.time,squeeze(dynRedGlobal.nlin.disp(node2plot,dofPl,:)),'-g','linewidth',1.5)
+xline(timeSwitch,'color','green','linewidth',2,'LineStyle','--')
 xlabel('time [s]','fontsize',fontsize); ylabel('u [m/s]','fontsize', fontsize)
 title(['velocity, normalized plotted dof location: ',num2str(plotDofLocation(1)),',',...
     num2str(plotDofLocation(2)),',  dof: ',num2str(dofPl)]);
 ax = gca; grid on; ax.FontSize = fontsize; %legend('HFM','RED');%'RED global','fontsize',fontsize);
 
 figure('units','normalized','position',[0.3,0.1,0.6,0.7]); hold on
-plot(dynRedVar.nlin.time,squeeze(dynRedVar.nlin.acc(node2plot,dofPl,:)),'--r','linewidth',linewidth)
+plot(dynRedVar.nlin.time,squeeze(dynRedVar.nlin.acc(node2plot,dofPl,:)),'-r','linewidth',linewidth)
 %plot(dynRedGlobal.nlin.time,squeeze(dynRedGlobal.nlin.disp(node2plot,dofPl,:)),'-g','linewidth',1.5)
+xline(timeSwitch,'color','green','linewidth',2,'LineStyle','--')
 xlabel('time [s]','fontsize',fontsize); ylabel('u [m/(s^2)]','fontsize', fontsize)
 title(['acceleration, normalized plotted dof location: ',num2str(plotDofLocation(1)),',',...
     num2str(plotDofLocation(2)),',  dof: ',num2str(dofPl)]);
