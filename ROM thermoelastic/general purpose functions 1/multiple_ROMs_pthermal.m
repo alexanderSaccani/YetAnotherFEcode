@@ -1,4 +1,5 @@
-function [ROMs,VMs,MDs,eqDisp,natFreq] = multiple_ROMs_pthermal(fullAssembly, p, Tfun, gradFun, n_VMs, thermEq, orthog, reordBasis, unconstrainBasis)
+function [ROMs,VMs,MDs,eqDisp,natFreq] = multiple_ROMs_pthermal(fullAssembly,...
+    p, Tfun, gradFun, n_VMs, thermEq, orthog, reordBasis, unconstrainBasis,refBasis)
 %  Author: Alexander Saccani, pHD candidate ETHZ, 12/2022
 %  last modified: 25.05.2023
 %
@@ -30,6 +31,8 @@ function [ROMs,VMs,MDs,eqDisp,natFreq] = multiple_ROMs_pthermal(fullAssembly, p,
 %   8) reordBasis is a logical. If true the basis is reorder to avoid mode
 %   veering
 %   9) unconstrainBasis is a logical. If true the basis is unconstrained
+%   10) refBasis is an integer that indicates which basis is used for
+%   refernce in the basis ordering process.
 %
 %  OUTPUT:
 %   1)ROMs: cell array containg in each cell a ROM corresponding to
@@ -129,17 +132,19 @@ end
 % reorder basis to avoid mode veering if required (make sure that orth is
 % true)
 if ( reordBasis && orthog )
-    V_ref = ROMs{1}.V;
-    for ii = 2:n_ROMs
-
-        P_ii = (ROMs{ii}.V)'*V_ref;
+    V_ref = ROMs{refBasis}.V;
+    basisIndList = 1:n_ROMs;
+    basisIndList(refBasis) = [];
+    for ii = 1:n_ROMs-1
+        jj = basisIndList(ii);
+        P_ii = (ROMs{jj}.V)'*V_ref;
         [L,~,R] = svd(P_ii);
         Q_ii = L*R';
-        ROMs{ii}.V = (ROMs{ii}.V)*Q_ii;
-
+        subspace((ROMs{jj}.V)*Q_ii,ROMs{jj}.V)
+        ROMs{jj}.V = (ROMs{jj}.V)*Q_ii;
     end
 elseif reordBasis && ~orthog
-    warning('In order to reoder basis set orthog flag to true')
+    warning('In order to reorder basis set orthog flag to true')
 end
 
 

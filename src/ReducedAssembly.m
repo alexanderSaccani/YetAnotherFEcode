@@ -6,9 +6,15 @@ classdef ReducedAssembly < Assembly
     end
 
     methods
-        function self = ReducedAssembly(Mesh,V)
+        function self = ReducedAssembly(Mesh,V,varargin)
             % Assembly (superclass) constructor
-            self@Assembly(Mesh);
+            if nargin <3
+                parallOpt = false;
+            else
+                parallOpt = varargin{1};
+            end
+
+            self@Assembly(Mesh,parallOpt);
             
             % set reduction basis
             self.V = V;
@@ -67,7 +73,7 @@ classdef ReducedAssembly < Assembly
             elementSet = find(elementWeights);
             
             % Computing element level contributions
-            for j = elementSet
+            parfor j = elementSet
                 thisElement = Elements(j).Object;
                 index = thisElement.iDOFs;          
                 Ve = V(index,:);

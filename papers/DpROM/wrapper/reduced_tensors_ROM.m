@@ -41,10 +41,14 @@
 % Last Modified: 31 Jan 2022
 % Author: Jacopo Marconi, Politecnico di Milano
 
-function tensors = reduced_tensors_ROM(myAssembly, elements, V, USEJULIA)
+function tensors = reduced_tensors_ROM(myAssembly, elements, V, USEJULIA, parallOpt)
 
 if nargin < 4
     USEJULIA = 0;
+end
+
+if nargin < 5
+    parallOpt = false;
 end
 
 t0=tic;
@@ -144,7 +148,7 @@ else
     u0 = zeros( myMesh.nDOFs, 1);    
     
     % create ROM object
-    RomAssembly = ReducedAssembly(myMesh, V);
+    RomAssembly = ReducedAssembly(myMesh, V, parallOpt);
     
     % compute reduced tensors
     disp(' REDUCED TENSORS (standard ~ using Matlab):')

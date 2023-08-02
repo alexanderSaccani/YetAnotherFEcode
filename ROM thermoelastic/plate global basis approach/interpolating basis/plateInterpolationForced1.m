@@ -272,7 +272,7 @@ gradFun.flag = true; %must put it true because it is shell element
 gradFun.fun = @(dummy) zeros(Assembly.Mesh.nNodes,1);
 gradFun.param = zeros(1,length(p));
 unconstrainBasis = true;
-refBasis = 1;
+refBasis = 15;
 [ROMs.models,sampledVMs,sampledMDs,sampledEqDisp,natFreq] = multiple_ROMs_pthermal(Assembly,...
             p, T_p, gradFun, nVMs, thermEq, orthog, reordBasis, unconstrainBasis, refBasis);
   
@@ -280,13 +280,20 @@ refBasis = 1;
 ROMs.psamples = p;
 
 %% Plot the thermal equilibrium
-eq = sampledEqDisp{9};
+eq = sampledEqDisp{50};
 eq = reshape(eq,5,[]).';
 figure
 PlotFieldonDeformedMesh([nodes,zNodes],elementsPlot, [eq(:,1),...
             eq(:,2), eq(:,3)], 'factor',10);
 
-%%
+%% Plot the natural frequencies
+figure
+hold on
+for ii =1:size(natFreq,1)
+    plot(natFreq(ii,:))
+end
+xlabel('numb of sample')
+ylabel('omega [rad/s]')
 %% Test on thermal trajectory
 
 %FORCING___________________________________________________________________
@@ -310,7 +317,7 @@ fForc = 150; %close to second frequency
 omForc = fForc*2*pi;
 TForc = 1/fForc;
 
-Fext = @(t) F0*cos(omForc*t);
+Fext = @(t) 0*F0*cos(omForc*t);
 %%
 %TEMPERATURE VARIATION_____________________________________________________
 thetaTraj = 180/pi*atan(Ly/Lx);%30; %inclination of center trajectory
@@ -358,7 +365,7 @@ txt = text('Units', 'Normalized', 'Position', [0.4, 0.9], 'string',...
 %% RUN HFM
 %HFM_______________________________________________________________________
 
-runHFM = true;
+runHFM = false;
 
 if runHFM 
 
@@ -391,7 +398,7 @@ uDynFull = Assembly.unconstrain_vector(uDynFull);
 dynFull.nlin.disp = decodeDofsNodes(uDynFull,nNodes,5); % (node, dof of node, tsamp)
 dynFull.nlin.time = TI_NL.Solution.time;
 
-save('saved_simulations/HFRun.mat','dynFull');
+save('saved_simulations/HFRun_noForc.mat','dynFull');
 
 else
     
@@ -399,6 +406,17 @@ filenameHFRun = 'saved_simulations/HFRun.mat';
 load(filenameHFRun)
 
 end
+
+%% prepare array 4 interpolation of basis
+%prepare array for interpolation
+nROMs = length(ROMs.models);
+nVecBasis = size(ROMs.models{1}.V,2);
+nDofsFull = size(ROMs.models{1}.V,1);
+array4Int = zeros(nROMs,nDofsFull,nVecBasis);
+for ii = 1:nROMs
+    array4Int(ii,:,:) = ROMs.models{ii}.V;
+end
+
 
 %% Simulation with interpolated basis
 
@@ -423,15 +441,6 @@ if RUNROM
     %
     % end
 
-    %prepare array for interpolation
-    nROMs = length(ROMs.models);
-    nVecBasis = size(ROMs.models{1}.V,2);
-    nDofsFull = size(ROMs.models{1}.V,1);
-    array4Int = zeros(nROMs,nDofsFull,nVecBasis);
-    for ii = 1:nROMs
-        array4Int(ii,:,:) = ROMs.models{ii}.V;
-    end
-
     % nonlinear Residual evaluation function handle
     residualInterpBasis = @(q,qd,qdd,t)thermal_residual_interpolation_mod(q,qd,qdd,t,Assembly,ROMs,p_fun_t,Fext,array4Int,Tdynt,gradTt);
 
@@ -452,7 +461,7 @@ if RUNROM
     dynRedInt.nlin.time = timeRedInt;
 
 
-    save('saved_simulations/RedRun.mat','dynRedInt');
+    save('saved_simulations/RedRun_unforced_V28.mat','dynRedInt');
 
 
 else
@@ -461,6 +470,89 @@ else
     load(filenameRedRun)
 
 end
+
+%% Plot time varying basis (with interpolation)
+ntsamples = 1e3;
+tmin = 0;
+tmax = tint;
+Vt = V_fun_t(array4Int,ROMs.psamples,p_fun_t,tmin,tmax,ntsamples);
+
+%%
+vector2plot = 2;
+
+v = squeeze(Vt(:,vector2plot,:));
+
+dof2plot = 5;
+figure
+for ii = 1:10:size(v,2)
+    vii = reshape(v(:,ii),5,[]).';
+    dispii = vii(:,dof2plot);
+    hf = PlotFieldonMesh(nodes,elementsPlot,dispii);
+    %clim([-0.005, 0.005]); 
+    clim([-0.1, 0.1]); 
+     drawnow %limitrate
+%     PlotFieldonDeformedMesh([nodes,zNodes],elementsPlot, [vii(:,1),...
+%         vii(:,2), vii(:,3)], 'factor',1);
+  %  pause(3);
+end
+%% Plot time varying basis (only ROM samples)
+vector2plot = 28;
+
+v = squeeze(array4Int(:,:,vector2plot))';
+dof2plot = 5; %from 1 to 5
+
+figure
+for ii = 1:size(v,2)
+    vii = reshape(v(:,ii),5,[]).';
+    dispii = vii(:,dof2plot);
+    hf = PlotFieldonMesh(nodes,elementsPlot,abs(dispii));
+    %clim([-0.005, 0.005]);
+    clim([-0.2, 0.2]);
+    title(['sampled point: ',num2str(ii)])
+    drawnow
+    pause(1)
+end
+%% Check the fit
+
+timeVec = linspace(tmin,tmax,ntsamples);
+nTestSamples = 40;
+timeTestInd = round(rand(nTestSamples,1)*ntsamples);
+timeTestValues = timeVec(timeTestInd);
+
+psamplesTest = p_fun_t(timeTestValues);
+nVMs = 6;
+thermEq = true;
+orthog = true;
+reordBasis = false;
+gradFun.flag = true; %must put it true because it is shell element
+gradFun.fun = @(dummy) zeros(Assembly.Mesh.nNodes,1);
+gradFun.param = zeros(1,length(psamplesTest));
+unconstrainBasis = true;
+refBasis = 1;
+[ROMsTest.models,sampledVMsTest,sampledMDsTest,sampledEqDispTest,natFreqTest] = multiple_ROMs_pthermal(Assembly,...
+            psamplesTest, T_p, gradFun, nVMs, thermEq, orthog, reordBasis, unconstrainBasis, refBasis);
+  
+%do this inside of function next time
+ROMsTest.psamples = psamplesTest;
+
+angleTest = zeros(size(psamplesTest,2),1);
+angleTestStaticEq = zeros(size(psamplesTest,2),1);
+for ii = 1:size(psamplesTest,2)
+
+    Vinterpii = Vt(:,:,timeTestInd(ii));
+    angleTest(ii,:) = 180/pi*subspace(Vinterpii,ROMsTest.models{ii}.V);
+    angleTestStaticEq(ii,:) = 180/pi*subspace(Vinterpii,sampledEqDispTest{ii});
+end
+
+
+
+%% quasistatic solution from interpolation of equilibria
+
+uQuasist = interpolated_quasistatic(timeRedInt,ROMs.psamples,sampledEqDisp,p_fun_t);
+
+dynQuasist.nlin.disp = decodeDofsNodes(uQuasist,nNodes,5); % (node, dof of node, tsamp)
+dynQuasist.nlin.time = timeRedInt;
+
 
 %% Plot results
 %displacements
@@ -473,12 +565,13 @@ linewidth = 2;
 
 figure('units','normalized','position',[0.3,0.1,0.6,0.7]); hold on
 plot(dynFull.nlin.time,squeeze(dynFull.nlin.disp(node2plot,dofPl,:)),'-k','linewidth',linewidth)
-plot(dynRedInt.nlin.time,squeeze(dynRedInt.nlin.disp(node2plot,dofPl,:)),'--r','linewidth',linewidth)
+plot(dynRedInt.nlin.time,squeeze(dynRedInt.nlin.disp(node2plot,dofPl,:)),'--y','linewidth',linewidth)
+plot(dynRedInt.nlin.time,squeeze(dynQuasist.nlin.disp(node2plot,dofPl,:)),'--m','linewidth',linewidth)
 %plot(dynRedGlobal.nlin.time,squeeze(dynRedGlobal.nlin.disp(node2plot,dofPl,:)),'-g','linewidth',1.5)
 xlabel('time [s]','fontsize',fontsize); ylabel('u [m]','fontsize', fontsize)
 title(['normalized plotted dof location: ',num2str(plotDofLocation(1)),',',...
     num2str(plotDofLocation(2)),',  dof: ',num2str(dofPl)]);
-ax = gca; grid on; ax.FontSize = fontsize; legend('HFM','RED int');%,'RED global','fontsize',fontsize);
+ax = gca; grid on; ax.FontSize = fontsize; legend('HFM','RED int','quasistInt');%,'RED global','fontsize',fontsize);
 
 
 

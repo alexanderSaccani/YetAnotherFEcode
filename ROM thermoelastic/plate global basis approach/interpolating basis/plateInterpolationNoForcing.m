@@ -280,7 +280,7 @@ refBasis = 1;
 ROMs.psamples = p;
 
 %% Plot the thermal equilibrium
-eq = sampledEqDisp{9};
+eq = sampledEqDisp{23};
 eq = reshape(eq,5,[]).';
 figure
 PlotFieldonDeformedMesh([nodes,zNodes],elementsPlot, [eq(:,1),...
@@ -310,7 +310,7 @@ fForc = 150; %close to second frequency
 omForc = fForc*2*pi;
 TForc = 1/fForc;
 
-Fext = @(t) F0*cos(omForc*t);
+Fext = @(t) 0*F0*cos(omForc*t);
 %%
 %TEMPERATURE VARIATION_____________________________________________________
 thetaTraj = 180/pi*atan(Ly/Lx);%30; %inclination of center trajectory
@@ -358,7 +358,7 @@ txt = text('Units', 'Normalized', 'Position', [0.4, 0.9], 'string',...
 %% RUN HFM
 %HFM_______________________________________________________________________
 
-runHFM = true;
+runHFM = false;
 
 if runHFM 
 
@@ -391,7 +391,7 @@ uDynFull = Assembly.unconstrain_vector(uDynFull);
 dynFull.nlin.disp = decodeDofsNodes(uDynFull,nNodes,5); % (node, dof of node, tsamp)
 dynFull.nlin.time = TI_NL.Solution.time;
 
-save('saved_simulations/HFRun.mat','dynFull');
+save('saved_simulations/HFRun_noForc.mat','dynFull');
 
 else
     
@@ -452,7 +452,7 @@ if RUNROM
     dynRedInt.nlin.time = timeRedInt;
 
 
-    save('saved_simulations/RedRun.mat','dynRedInt');
+    save('saved_simulations/RedRun_noForc_1vec.mat','dynRedInt');
 
 
 else
@@ -462,23 +462,32 @@ else
 
 end
 
+%% quasistatic solution from interpolation of equilibria
+
+uQuasist = interpolated_quasistatic(timeRedInt,ROMs.psamples,sampledEqDisp,p_fun_t);
+
+dynQuasist.nlin.disp = decodeDofsNodes(uQuasist,nNodes,5); % (node, dof of node, tsamp)
+dynQuasist.nlin.time = timeRedInt;
+
+
 %% Plot results
 %displacements
 plotDofLocation = [0.2,0.2]; %percentage of plate length (along x and y)
 node2plot = find_node(plotDofLocation(1)*Lx,plotDofLocation(2)*Ly,[],nodes); % node to plot
-dofPl = 3;
+dofPl = 1;
 
 fontsize = 15;
 linewidth = 2;
 
 figure('units','normalized','position',[0.3,0.1,0.6,0.7]); hold on
 plot(dynFull.nlin.time,squeeze(dynFull.nlin.disp(node2plot,dofPl,:)),'-k','linewidth',linewidth)
-plot(dynRedInt.nlin.time,squeeze(dynRedInt.nlin.disp(node2plot,dofPl,:)),'--r','linewidth',linewidth)
+plot(dynRedInt.nlin.time,squeeze(dynRedInt.nlin.disp(node2plot,dofPl,:)),'--y','linewidth',linewidth)
+plot(dynRedInt.nlin.time,squeeze(dynQuasist.nlin.disp(node2plot,dofPl,:)),'--m','linewidth',linewidth)
 %plot(dynRedGlobal.nlin.time,squeeze(dynRedGlobal.nlin.disp(node2plot,dofPl,:)),'-g','linewidth',1.5)
 xlabel('time [s]','fontsize',fontsize); ylabel('u [m]','fontsize', fontsize)
 title(['normalized plotted dof location: ',num2str(plotDofLocation(1)),',',...
     num2str(plotDofLocation(2)),',  dof: ',num2str(dofPl)]);
-ax = gca; grid on; ax.FontSize = fontsize; legend('HFM','RED int');%,'RED global','fontsize',fontsize);
+ax = gca; grid on; ax.FontSize = fontsize; legend('HFM','RED int','quasistInt');%,'RED global','fontsize',fontsize);
 
 
 
